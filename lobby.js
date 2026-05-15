@@ -336,14 +336,15 @@ randomSeedButton.addEventListener("click", () => {
   formDirty = true;
 });
 quickAiButton?.addEventListener("click", () => {
-  modeEl.value = "bot";
-  challengeEl.value = "standard";
-  scenarioEl.value = "2";
-  botDifficultyEl.value = "7";
-  playerCountEl.value = "2";
-  seedEl.value = String(Math.floor(Math.random() * 1000000) + 1);
-  updateModeLabels();
-  createGame();
+  const params = new URLSearchParams({
+    scenario: "2",
+    difficulty: "8",
+    botPolicy: "moe8",
+    speed: "1",
+    fps: "60",
+    seed: String(Math.floor(Math.random() * 1000000) + 1),
+  });
+  window.location.href = `/play.html?${params.toString()}`;
 });
 quickPartyButton?.addEventListener("click", () => {
   modeEl.value = "human";

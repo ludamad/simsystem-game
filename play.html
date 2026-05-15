@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Simsystem Live</title>
-    <link rel="stylesheet" href="styles.css?v=play-ux-10">
+    <link rel="stylesheet" href="styles.css?v=play-ux-12">
   </head>
   <body>
     <main class="app live-app">
@@ -12,12 +12,17 @@
         <div class="brand">Simsystem Live</div>
         <select id="scenarioSelect" class="scenario-select setup-control" title="Scenario"></select>
         <button id="randomScenario" class="setup-control" type="button" title="Random scenario and seed">Random</button>
-        <select id="speedSelect" class="speed-select setup-control" title="Game speed">
+        <select id="speedSelect" class="speed-select setup-control" title="Game speed multiplier">
           <option value="0.25">0.25x</option>
-          <option value="0.5" selected>0.5x</option>
-          <option value="1">1x</option>
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
           <option value="2">2x</option>
         </select>
+        <label class="fps-control setup-control" title="Simulation frames per second">
+          <span>Game FPS</span>
+          <input id="gameFpsSlider" type="range" min="15" max="120" step="5" value="60">
+          <output id="gameFpsValue">60</output>
+        </label>
         <select id="difficultySelect" class="speed-select setup-control" title="Bot difficulty">
           <option value="1">Bot 1</option>
           <option value="2">Bot 2</option>
@@ -56,6 +61,6 @@
     </main>
     <script src="simsystem_wasm.js"></script>
     <script src="iso_renderer.js?v=shared-iso-1"></script>
-    <script src="play.js?v=play-ux-11"></script>
+    <script src="play.js?v=play-ux-12"></script>
   </body>
 </html>

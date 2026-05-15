@@ -1600,7 +1600,8 @@ button,
 .live-link,
 .speed select,
 .scenario-select,
-.speed-select {
+.speed-select,
+.fps-control {
   border: 1px solid #596068;
   background: rgba(43, 48, 52, 0.72);
   color: #f3efe6;
@@ -1630,6 +1631,29 @@ button.ready {
 
 .speed-select {
   width: 78px;
+}
+
+.fps-control {
+  width: 184px;
+  grid-template-columns: auto minmax(70px, 1fr) 28px;
+  gap: 7px;
+  padding: 0 8px;
+  cursor: default;
+}
+
+.fps-control span,
+.fps-control output {
+  color: #d9e1dd;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.fps-control input {
+  width: 100%;
+  accent-color: #f0d66a;
+  cursor: pointer;
 }
 
 .quality-select {
@@ -2562,6 +2586,10 @@ button.ready {
   top: 14px;
   bottom: auto;
   z-index: 8;
+  width: min(1180px, calc(100vw - 32px));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 body.campaign-mode .live-toolbar .setup-control,

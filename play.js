@@ -9,6 +9,8 @@ const exportPlayLogButton = document.querySelector("#exportPlayLog");
 const scenarioSelect = document.querySelector("#scenarioSelect");
 const randomScenarioButton = document.querySelector("#randomScenario");
 const speedSelect = document.querySelector("#speedSelect");
+const gameFpsSlider = document.querySelector("#gameFpsSlider");
+const gameFpsValue = document.querySelector("#gameFpsValue");
 const difficultySelect = document.querySelector("#difficultySelect");
 const readyButton = document.querySelector("#readyButton");
 const soundButton = document.querySelector("#sound");
@@ -186,7 +188,8 @@ let simMs = 0;
 let simAccumulator = 0;
 let lastStatusUpdateAt = 0;
 let lastResultKey = "";
-let playSpeed = Math.max(0.1, Math.min(3, Number(urlParams.get("speed") || speedSelect.value || 0.5)));
+let playSpeed = Math.max(0.1, Math.min(3, Number(urlParams.get("speed") || speedSelect.value || 1)));
+let targetGameFps = Math.max(15, Math.min(120, Number(urlParams.get("fps") || localStorage.getItem("simsystem_game_fps") || gameFpsSlider?.value || 60)));
 let seed = Math.max(1, Math.min(999999, Number(urlParams.get("seed") || botAdminConfig?.seed || Math.floor(Math.random() * 100000))));
 let currentScenario = Math.max(0, Math.min(scenarios.length - 1, Number(urlParams.get("scenario") || botAdminConfig?.scenario || 0)));
 let botDifficulty = Math.max(1, Math.min(10, Number(urlParams.get("difficulty") || botAdminConfig?.difficulty || difficultySelect?.value || 3)));
@@ -350,6 +353,12 @@ function playableAudioSources(sources) {
     if (source.endsWith(".wav")) return Boolean(audioProbe.canPlayType("audio/wav"));
     return true;
   });
+}
+
+function updateGameFpsControl() {
+  targetGameFps = Math.max(15, Math.min(120, Math.round(Number(targetGameFps) / 5) * 5));
+  if (gameFpsSlider) gameFpsSlider.value = String(targetGameFps);
+  if (gameFpsValue) gameFpsValue.value = String(targetGameFps);
 }
 
 async function toggleSound() {
@@ -1029,6 +1038,7 @@ function updateLanChrome() {
   scenarioSelect.disabled = true;
   randomScenarioButton.disabled = true;
   speedSelect.disabled = true;
+  if (gameFpsSlider) gameFpsSlider.disabled = true;
   difficultySelect.disabled = true;
   document.querySelector("#reset").disabled = false;
   currentScenario = lan.scenario;
@@ -3623,6 +3633,12 @@ speedSelect.addEventListener("change", () => {
   playSpeed = Number(speedSelect.value || 0.5);
   simAccumulator = 0;
 });
+gameFpsSlider?.addEventListener("input", () => {
+  targetGameFps = Number(gameFpsSlider.value || 60);
+  localStorage.setItem("simsystem_game_fps", String(targetGameFps));
+  updateGameFpsControl();
+  simAccumulator = 0;
+});
 randomScenarioButton.addEventListener("click", () => {
   const scenario = Math.floor(Math.random() * scenarios.length);
   resetGame({ randomSeed: true, scenario });
@@ -3683,8 +3699,8 @@ function loop(t) {
     pollLanLobby();
     stepLanToServer();
   } else if (Module && snap) {
-    simAccumulator += dt * 60 * playSpeed;
-    const ticks = Math.min(8, Math.floor(simAccumulator));
+    simAccumulator += dt * targetGameFps * playSpeed;
+    const ticks = Math.min(Math.max(8, Math.ceil(targetGameFps / 12)), Math.floor(simAccumulator));
     if (ticks > 0) {
       stepEngine(ticks);
       simAccumulator -= ticks;
@@ -3702,6 +3718,7 @@ async function boot() {
   scenarioSelect.value = String(currentScenario);
   difficultySelect.value = String(botDifficulty);
   speedSelect.value = String(playSpeed);
+  updateGameFpsControl();
   if (typeof createSimsystemModule !== "function") {
     statusEl.textContent = "WASM build missing";
     draw();
