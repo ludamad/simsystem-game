@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simsystem Story Run</title>
+    <link rel="stylesheet" href="styles.css?v=story-run-1">
+  </head>
+  <body>
+    <main class="rogue-app">
+      <section class="rogue-shell">
+        <header class="rogue-header story-header">
+          <div>
+            <div class="brand">Simsystem</div>
+            <h1>Frontier Run</h1>
+          </div>
+          <div class="header-actions">
+            <button id="newRun" type="button" title="Start over">New Run</button>
+            <a class="live-link" href="/index.html">Home</a>
+          </div>
+        </header>
+
+        <section class="story-stage" aria-live="polite">
+          <div class="story-map-art" aria-hidden="true">
+            <div class="story-lane"></div>
+            <div class="story-base red"></div>
+            <div class="story-base blue"></div>
+            <div class="story-unit wing-a"></div>
+            <div class="story-unit wing-b"></div>
+            <div class="story-unit wing-c"></div>
+          </div>
+          <article class="story-brief">
+            <div id="missionKicker" class="mission-kicker">Operation</div>
+            <h2 id="missionTitle">Loading</h2>
+            <p id="missionText"></p>
+            <div id="missionIntel" class="mission-intel"></div>
+            <div class="story-actions">
+              <button id="startBattle" class="choice-card primary mission-start" type="button">
+                <strong>Deploy</strong>
+                <span id="deploySubtext">Enter the battle</span>
+              </button>
+              <button id="draftMore" class="choice-card compact" type="button">
+                <strong>Choose Reward</strong>
+                <span>Shape this run before the fight</span>
+              </button>
+              <button id="claimSector" class="choice-card compact hidden" type="button">
+                <strong>Hold Sector</strong>
+                <span>The line moves forward</span>
+              </button>
+            </div>
+          </article>
+        </section>
+
+        <section class="story-footer">
+          <div id="runMap" class="route-line" aria-label="Campaign route"></div>
+          <aside class="run-summary">
+            <div id="runStats" class="run-statline">Loading...</div>
+            <div id="runDeck" class="reward-strip"></div>
+            <div id="rogueLog" class="story-log"></div>
+          </aside>
+        </section>
+
+        <section class="draft-sheet hidden" id="choicePanel" aria-live="polite"></section>
+        <div id="missionStage" class="mission-stage hidden"></div>
+      </section>
+    </main>
+    <script src="roguelike.js?v=story-run-1"></script>
+  </body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simsystem Replay</title>
+    <link rel="stylesheet" href="styles.css?v=production-queue-1">
+  </head>
+  <body>
+    <main class="app">
+      <section class="toolbar">
+        <div class="brand">Simsystem Replay</div>
+        <label class="file">
+          <input id="file" type="file" accept="application/json">
+          Load replay
+        </label>
+        <button id="play" type="button">▶</button>
+        <button id="prev" type="button" title="Previous marker">‹</button>
+        <button id="next" type="button" title="Next marker">›</button>
+        <button id="exportVideo" type="button" title="Download 60fps replay video">60fps Video</button>
+        <button id="sound" type="button" title="Click to enable replay sound">Enable audio</button>
+        <a class="live-link" href="index.html" title="Open main menu">Home</a>
+        <a class="live-link" href="admin.html" title="Tune bot behavior">Bot Admin</a>
+        <a class="live-link" href="play.html" title="Open playable local skirmish">Play live</a>
+        <label class="speed">
+          Speed
+          <select id="speed">
+            <option value="180">Slow</option>
+            <option value="90" selected>Review</option>
+            <option value="45">Fast</option>
+            <option value="22">Very fast</option>
+          </select>
+        </label>
+        <label class="review">
+          <input id="eventSlow" type="checkbox" checked>
+          Slow events
+        </label>
+        <input id="scrub" type="range" min="0" max="0" value="0">
+        <div id="tick" class="tick">tick 0</div>
+        <div id="rate" class="rate">0 fps · 0 tps</div>
+        <div id="exportStatus" class="export-status"></div>
+      </section>
+      <section class="stage">
+        <canvas id="arena" width="960" height="640"></canvas>
+        <aside class="panel">
+          <div id="offer" class="offer">No replay loaded</div>
+          <div id="players" class="players"></div>
+          <div id="metrics" class="metrics"></div>
+        </aside>
+      </section>
+    </main>
+    <script src="iso_renderer.js?v=shared-iso-1"></script>
+    <script src="replay.js?v=production-queue-1"></script>
+  </body>
+</html>

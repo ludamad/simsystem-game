@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simsystem</title>
+    <link rel="stylesheet" href="styles.css?v=home-1">
+  </head>
+  <body>
+    <main class="home-app">
+      <section class="home-shell">
+        <header class="home-header">
+          <div>
+            <div class="brand home-brand">Simsystem</div>
+            <h1>Play</h1>
+          </div>
+          <nav class="home-utility" aria-label="Tools">
+            <a href="admin.html">Bot Admin</a>
+            <a href="replay.html">Replay</a>
+          </nav>
+        </header>
+
+        <section class="home-modes" aria-label="Game modes">
+          <a class="home-card primary" href="play.html?scenario=2&amp;difficulty=3">
+            <span class="mode-label">Practice</span>
+            <strong>VS Computer</strong>
+            <em>Beginner map, gentler bot.</em>
+          </a>
+          <a class="home-card" href="play.html?scenario=0&amp;difficulty=7">
+            <span class="mode-label">Skirmish</span>
+            <strong>Standard Duel</strong>
+            <em>Balanced 1v1 with the current default bot.</em>
+          </a>
+          <a class="home-card boss" data-challenge="very-hard-bot" href="play.html?scenario=9&amp;difficulty=10&amp;seed=424242&amp;speed=0.5">
+            <span class="mode-label">Challenge</span>
+            <strong>Very Hard Bot</strong>
+            <em>Unfair fortress pressure. Survive, expand, and break blue.</em>
+          </a>
+          <a class="home-card" href="lobby.html">
+            <span class="mode-label">LAN</span>
+            <strong>Host Party</strong>
+            <em>Create a code for 2-4 players.</em>
+          </a>
+        </section>
+
+        <section class="home-join" aria-label="Join game">
+          <form class="join-code-home" action="/join" method="get">
+            <label for="homeJoinCode">Join with code</label>
+            <input id="homeJoinCode" name="code" type="text" inputmode="text" autocomplete="off" placeholder="ABC123">
+            <button type="submit">Join</button>
+          </form>
+          <div class="home-shortcuts" aria-label="Quick links">
+            <a href="play.html?scenario=4&amp;difficulty=8">Harass drill</a>
+            <a href="play.html?scenario=5&amp;difficulty=8">Siege break</a>
+            <a href="play.html?scenario=8&amp;difficulty=7">Close natural</a>
+            <a href="roguelike.html">Challenges</a>
+          </div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

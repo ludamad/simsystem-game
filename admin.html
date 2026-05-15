@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simsystem Bot Admin</title>
+    <link rel="stylesheet" href="styles.css?v=bot-admin-1">
+  </head>
+  <body>
+    <main class="admin-app">
+      <section class="admin-shell">
+        <header class="admin-header">
+          <div>
+            <div class="brand">Simsystem Admin</div>
+            <h1>Bot Rules</h1>
+          </div>
+          <div class="header-actions">
+            <a class="live-link" href="/index.html">Home</a>
+            <a class="live-link" href="/play.html?scenario=2&difficulty=7">Play</a>
+          </div>
+        </header>
+
+        <section class="admin-grid">
+          <form id="botAdminForm" class="admin-card admin-controls">
+            <label>
+              Map
+              <select id="scenario">
+                <option value="2">Beginner Map</option>
+                <option value="0">Training Duel</option>
+                <option value="1">Rush Defense</option>
+                <option value="4">Harass Bot</option>
+                <option value="5">Siege Break</option>
+                <option value="6">Back Bases</option>
+                <option value="8">Close Natural</option>
+                <option value="9">Very Hard Bot</option>
+              </select>
+            </label>
+            <label>
+              Difficulty
+              <input id="difficulty" type="range" min="1" max="10" value="8">
+              <output id="difficultyValue">8</output>
+            </label>
+            <label>
+              Bot Brain
+              <select id="policy">
+                <option value="command_center_danger_human_killer">Hard reactive</option>
+                <option value="command_center_harass">Harass and punish</option>
+                <option value="command_center_general">General macro</option>
+                <option value="command_center">Baseline command center</option>
+              </select>
+            </label>
+            <label>
+              Worker Target
+              <input id="workerTarget" type="range" min="12" max="30" value="30">
+              <output id="workerTargetValue">30</output>
+            </label>
+            <label>
+              Build-Time Scale
+              <input id="buildTimeScale" type="range" min="50" max="220" value="100" step="5">
+              <output id="buildTimeScaleValue">100%</output>
+            </label>
+            <label>
+              Expansion Drive
+              <input id="expandBias" type="range" min="0" max="100" value="82">
+              <output id="expandBiasValue">82</output>
+            </label>
+            <label>
+              Attack Threshold
+              <input id="attackThreshold" type="range" min="0" max="100" value="62">
+              <output id="attackThresholdValue">62</output>
+            </label>
+            <fieldset class="counter-preferences">
+              <legend>Counter Preferences</legend>
+              <label><input name="counterPreference" value="archers" type="checkbox"> Archers</label>
+              <label><input name="counterPreference" value="storm" type="checkbox"> Storm</label>
+              <label><input name="counterPreference" value="static_defense" type="checkbox"> Static defense</label>
+              <label><input name="counterPreference" value="siege" type="checkbox"> Siege</label>
+              <label><input name="counterPreference" value="vultures" type="checkbox"> Vultures</label>
+              <label><input name="counterPreference" value="skirmishers" type="checkbox"> Skirmishers</label>
+            </fieldset>
+            <div class="admin-actions">
+              <button id="saveConfig" type="submit">Save Rules</button>
+              <button id="launchGame" type="button">Launch Test</button>
+              <button id="resetConfig" type="button">Defaults</button>
+            </div>
+          </form>
+
+          <section class="admin-card">
+            <h2>Reaction Rules</h2>
+            <div id="rulesList" class="rules-list"></div>
+            <button id="addRule" type="button">Add Rule</button>
+          </section>
+
+          <section class="admin-card admin-summary">
+            <h2>Current Contract</h2>
+            <div id="summary"></div>
+            <code id="deeplink"></code>
+          </section>
+        </section>
+      </section>
+    </main>
+    <script src="admin.js?v=bot-admin-1"></script>
+  </body>
+</html>

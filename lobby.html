@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simsystem</title>
+    <link rel="stylesheet" href="styles.css?v=splash-1">
+  </head>
+  <body>
+    <main class="lobby-app">
+      <section class="lobby-shell">
+        <section class="splash-hero">
+          <div class="splash-copy">
+            <div class="brand">Simsystem</div>
+            <h1>Draft. Expand. Fight.</h1>
+            <p>Fast RTS battles with readable armies, simple invites, and bots that scale from practice to unfair.</p>
+          </div>
+          <div class="splash-menu">
+            <form id="newGameForm" class="lobby-card start-card">
+              <div class="quick-actions" aria-label="Start options">
+                <button id="quickAi" class="splash-action primary" type="button">
+                  <strong>Play vs AI</strong>
+                  <span>Recommended duel, Bot 7, beginner map.</span>
+                </button>
+                <button id="quickParty" class="splash-action" type="button">
+                  <strong>Host Party</strong>
+                  <span>Creates an invite code for 2-4 players.</span>
+                </button>
+                <button id="quickStory" class="splash-action" type="button">
+                  <strong>Story Challenge</strong>
+                  <span>Start the first guided combat scenario.</span>
+                </button>
+                <a class="splash-action" href="/admin.html">
+                  <strong>Bot Admin</strong>
+                  <span>Tune bot difficulty, policy, and reaction rules.</span>
+                </a>
+              </div>
+              <div class="join-strip prominent-join">
+                <input id="joinCode" type="text" inputmode="text" autocomplete="off" placeholder="INVITE CODE">
+                <button id="quickJoin" type="button">Join</button>
+              </div>
+              <div id="createStatus" class="lobby-status">Ready.</div>
+              <div class="hidden-config">
+                <select id="mode">
+                  <option value="bot">Human vs Bot</option>
+                  <option value="human">Party / LAN</option>
+                </select>
+                <select id="challenge">
+                  <option value="standard" selected>Standard RTS</option>
+                  <option value="workers">Story 1: Economy Drill</option>
+                  <option value="rush">Story 2: Rush Defense</option>
+                  <option value="fortress">Story 3: Break Fortress</option>
+                </select>
+              </div>
+            <details class="advanced-settings">
+              <summary>Advanced setup</summary>
+              <label id="playerCountField">
+                Party Size
+                <select id="playerCount">
+                  <option value="2" selected>2 players</option>
+                  <option value="3">3 players</option>
+                  <option value="4">4 players</option>
+                </select>
+              </label>
+              <label>
+                Map
+                <select id="scenario"></select>
+              </label>
+              <label>
+                Bot Difficulty
+                <select id="botDifficulty">
+                  <option value="1">Bot 1</option>
+                  <option value="2">Bot 2</option>
+                  <option value="3">Bot 3</option>
+                  <option value="4">Bot 4</option>
+                  <option value="5">Bot 5</option>
+                  <option value="6">Bot 6</option>
+                  <option value="7" selected>Bot 7</option>
+                  <option value="8">Bot 8</option>
+                  <option value="9">Bot 9</option>
+                  <option value="10">Bot 10</option>
+                </select>
+              </label>
+              <div id="mapCards" class="map-cards" aria-label="Map choices"></div>
+              <label>
+                Tick Rate
+                <select id="tickRate">
+                  <option value="30" selected>30 fps</option>
+                  <option value="45">45 fps</option>
+                  <option value="60">60 fps</option>
+                </select>
+              </label>
+              <label>
+                Input Delay
+                <select id="inputDelay">
+                  <option value="4">4 ticks</option>
+                  <option value="8" selected>8 ticks</option>
+                  <option value="12">12 ticks</option>
+                </select>
+              </label>
+              <label>
+                Seed
+                <input id="seed" type="number" min="1" value="20260510">
+              </label>
+            </details>
+            <button id="createGame" class="hidden" type="submit">Start</button>
+            <button id="randomSeed" class="hidden" type="button">Random Seed</button>
+          </form>
+
+          <section class="lobby-card current-match">
+            <h1 id="matchHeading">Play AI</h1>
+            <div id="inviteCodeBox" class="invite-code-box">------</div>
+            <div id="onlineHint" class="online-hint">Create a Human vs Human game, copy the code, and both players ready up from their seats.</div>
+            <div class="invite-actions">
+              <button id="copyCode" type="button">Copy Code</button>
+              <button id="copyJoin" type="button">Copy Join Link</button>
+              <a id="openSeat" class="seat-button primary-seat" href="#">Open My Seat</a>
+            </div>
+            <form id="joinForm" class="join-code-form">
+              <button type="submit" class="hidden">Join</button>
+            </form>
+            <div id="matchSummary" class="match-summary">Loading relay...</div>
+            <div id="seatStatus" class="seat-status"></div>
+            <details class="seat-details">
+              <summary>Seat links</summary>
+              <div id="seatLinks" class="seat-links"></div>
+              <div class="lobby-actions utility-actions">
+                <button id="copyLobby" type="button">Copy Lobby Link</button>
+                <button id="copyP2" type="button">Copy P2 Link</button>
+                <button id="copyAll" type="button">Copy All Links</button>
+              </div>
+            </details>
+          </section>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="lobby.js?v=api-fallback-1"></script>
+  </body>
+</html>

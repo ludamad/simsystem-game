@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simsystem Live</title>
+    <link rel="stylesheet" href="styles.css?v=play-ux-10">
+  </head>
+  <body>
+    <main class="app live-app">
+      <section class="toolbar live-toolbar">
+        <div class="brand">Simsystem Live</div>
+        <select id="scenarioSelect" class="scenario-select setup-control" title="Scenario"></select>
+        <button id="randomScenario" class="setup-control" type="button" title="Random scenario and seed">Random</button>
+        <select id="speedSelect" class="speed-select setup-control" title="Game speed">
+          <option value="0.25">0.25x</option>
+          <option value="0.5" selected>0.5x</option>
+          <option value="1">1x</option>
+          <option value="2">2x</option>
+        </select>
+        <select id="difficultySelect" class="speed-select setup-control" title="Bot difficulty">
+          <option value="1">Bot 1</option>
+          <option value="2">Bot 2</option>
+          <option value="3" selected>Bot 3</option>
+          <option value="4">Bot 4</option>
+          <option value="5">Bot 5</option>
+          <option value="6">Bot 6</option>
+          <option value="7">Bot 7</option>
+          <option value="8">Bot 8</option>
+          <option value="9">Bot 9</option>
+          <option value="10">Bot 10</option>
+        </select>
+        <div class="toolbar-spacer"></div>
+        <button id="attackMove" class="setup-control" type="button" title="A then click">Attack</button>
+        <button id="expand" class="setup-control" type="button" title="X then click an expansion">Expand</button>
+        <button id="readyButton" class="hidden" type="button" title="Ready for LAN match">Ready</button>
+        <button id="sound" type="button" title="Click to enable game sound">Enable audio</button>
+        <button id="reset" type="button">Reset</button>
+        <button id="exportPlayLog" type="button" title="Download the local debug log">Log</button>
+        <a class="live-link home-link" href="index.html">Home</a>
+        <a class="live-link admin-link setup-control" href="admin.html" title="Tune bot behavior">Bot Admin</a>
+        <a class="live-link replay-link setup-control" href="replay.html">Replay</a>
+        <div id="liveStatus" class="rate">loading</div>
+      </section>
+      <section class="stage">
+        <canvas id="arena" width="960" height="640"></canvas>
+        <div id="resultBanner" class="result-banner hidden"></div>
+        <div id="lanStartGate" class="lan-start-gate hidden"></div>
+        <div id="resourceHud" class="resource-hud"></div>
+        <div id="productionReadout" class="production-readout"></div>
+        <div id="productionBar" class="production-bar production-dock"></div>
+        <aside class="panel live-panel">
+          <div id="livePanel" class="players"></div>
+        </aside>
+      </section>
+    </main>
+    <script src="simsystem_wasm.js"></script>
+    <script src="iso_renderer.js?v=shared-iso-1"></script>
+    <script src="play.js?v=play-ux-11"></script>
+  </body>
+</html>
