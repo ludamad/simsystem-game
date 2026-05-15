@@ -626,6 +626,34 @@ function panCameraFromDrag(dragState, point) {
   groundCacheKey = "";
 }
 
+function beginRightDragPan(point, pureMove = false, pointerId = -1) {
+  rightClick = {
+    x: point.x,
+    y: point.y,
+    cx: point.x,
+    cy: point.y,
+    pureMove,
+    pointerId,
+    mode: "right-candidate",
+    camera: { ...camera },
+  };
+  drag = rightClick;
+}
+
+function updateRightDragPan(point, threshold = 4) {
+  if (!rightClick) return false;
+  rightClick.cx = point.x;
+  rightClick.cy = point.y;
+  const moved = Math.hypot(rightClick.cx - rightClick.x, rightClick.cy - rightClick.y);
+  if (rightClick.mode === "right-candidate" && moved > threshold) {
+    rightClick.mode = "pan";
+    canvas.classList.add("dragging");
+  }
+  if (rightClick.mode !== "pan") return false;
+  panCameraFromDrag(rightClick, point);
+  return true;
+}
+
 function pointerDistance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -3205,17 +3233,7 @@ canvas.addEventListener("pointerdown", (evt) => {
   p.pureMove = evt.ctrlKey || evt.metaKey;
   if (evt.button === 2) {
     evt.preventDefault();
-    rightClick = {
-      x: p.x,
-      y: p.y,
-      cx: p.x,
-      cy: p.y,
-      pureMove: p.pureMove,
-      pointerId: evt.pointerId,
-      mode: "right-candidate",
-      camera: { ...camera },
-    };
-    drag = rightClick;
+    beginRightDragPan(p, p.pureMove, evt.pointerId);
     return;
   }
   drag = {
@@ -3246,6 +3264,10 @@ canvas.addEventListener("pointermove", (evt) => {
   }
   const hovered = buildingAt(p);
   hoverBuildingId = hovered && hovered.owner < 0 ? hovered.id : -1;
+  if ((evt.buttons & 2) && updateRightDragPan(p, 4)) {
+    evt.preventDefault();
+    return;
+  }
   const activeDrag = rightClick || drag;
   if (!activeDrag) return;
   activeDrag.cx = p.x;
@@ -3366,6 +3388,28 @@ canvas.addEventListener("pointerup", (evt) => {
   }
   drag = null;
   canvas.classList.remove("dragging");
+});
+
+canvas.addEventListener("mousedown", (evt) => {
+  if (evt.button !== 2) return;
+  evt.preventDefault();
+  const p = clientPoint(evt);
+  beginRightDragPan(p, evt.ctrlKey || evt.metaKey, -1);
+});
+
+document.addEventListener("mousemove", (evt) => {
+  if (!(evt.buttons & 2) || !rightClick) return;
+  const p = clientPoint(evt);
+  if (updateRightDragPan(p, 2)) evt.preventDefault();
+});
+
+document.addEventListener("mouseup", (evt) => {
+  if (evt.button !== 2 || rightClick?.mode !== "pan") return;
+  lastContextMenuOrderAt = performance.now();
+  rightClick = null;
+  drag = null;
+  canvas.classList.remove("dragging");
+  evt.preventDefault();
 });
 
 canvas.addEventListener("pointercancel", (evt) => {
