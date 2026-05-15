@@ -3304,6 +3304,7 @@ canvas.addEventListener("pointerup", (evt) => {
       ? { x: rightClick.x, y: rightClick.y, pureMove: rightClick.pureMove || p.pureMove, rightClick: true }
       : { ...p, rightClick: true };
     issueOrder(orderPoint);
+    lastContextMenuOrderAt = performance.now();
     rightClick = null;
     drag = null;
     canvas.classList.remove("dragging");
