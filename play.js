@@ -75,16 +75,18 @@ const supplyCostByClass = {
   skirmisher: 1.2,
 };
 const scenarios = [
-  { id: 0, name: "Map 1", brief: "", objective: "" },
-  { id: 1, name: "Map 2", brief: "", objective: "" },
-  { id: 2, name: "Map 3", brief: "", objective: "" },
-  { id: 3, name: "Map 4", brief: "", objective: "" },
-  { id: 4, name: "Map 5", brief: "", objective: "" },
-  { id: 5, name: "Map 6", brief: "", objective: "" },
-  { id: 6, name: "Map 7", brief: "", objective: "" },
-  { id: 7, name: "Map 8", brief: "", objective: "" },
-  { id: 8, name: "Map 9", brief: "", objective: "" },
-  { id: 9, name: "Map 10", brief: "", objective: "" },
+  { id: 0, name: "Training Expansion", brief: "", objective: "" },
+  { id: 1, name: "Rush Defense", brief: "", objective: "" },
+  { id: 2, name: "First Expansion", brief: "", objective: "" },
+  { id: 3, name: "Random Map", brief: "", objective: "" },
+  { id: 4, name: "Harass Defense", brief: "", objective: "" },
+  { id: 5, name: "Siege Break", brief: "", objective: "" },
+  { id: 6, name: "Back Bases", brief: "", objective: "" },
+  { id: 7, name: "Wide Ring", brief: "", objective: "" },
+  { id: 8, name: "Close Natural", brief: "", objective: "" },
+  { id: 9, name: "Very Hard Bot", brief: "", objective: "" },
+  { id: 10, name: "Fixed Army Drill", brief: "", objective: "" },
+  { id: 11, name: "Production Duel", brief: "", objective: "" },
 ];
 const audioProbe = document.createElement("audio");
 const soundFiles = {
@@ -111,18 +113,23 @@ const heardAudioEffects = new Map();
 const heardAudioEvents = new Map();
 const tutorialSteps = [
   {
-    title: "Select workers",
-    body: "Drag a box around your yellow workers or click one worker.",
+    title: "Start with workers",
+    body: "Drag a box around your workers or click one. Your first goal is a second base.",
     done: () => selectedWorkers().length > 0,
   },
   {
-    title: "Take an expansion",
-    body: "Click a gray expansion building. The nearest worker will claim it.",
+    title: "Take your first expansion",
+    body: "With a worker selected, click a gray expansion building. Keep making workers while it claims.",
     done: () => (snap?.buildings || []).some((b) => b.owner === controlledPlayer() && b.kind === "expansion"),
   },
   {
-    title: "Produce an army",
-    body: "Use Q through P to build units. Try Warrior, Archer, Siege, and Storm.",
+    title: "Fill production",
+    body: "Use Q for workers and W/E/R/T/Y/O/P for army. You have three production slots; keep them busy.",
+    done: () => ((snap?.players || []).find((p) => p.id === controlledPlayer())?.construction_queue_used || 0) >= 2,
+  },
+  {
+    title: "Make an army",
+    body: "Spend extra money on combat units. Shift+A selects your whole army when you are ready to move out.",
     done: () => (snap?.units || []).filter((u) => u.owner === controlledPlayer() && u.class !== "worker").length >= 4,
   },
   {
@@ -132,7 +139,7 @@ const tutorialSteps = [
   },
   {
     title: "Win condition",
-    body: "Destroy all enemy buildings. Use expansions to keep production ahead.",
+    body: "Destroy enemy structures. In production games, losing all units is not game over; rebuild and attack again.",
     done: () => (snap?.buildings || []).filter((b) => b.owner !== controlledPlayer() && b.owner >= 0 && b.alive).length === 0,
   },
 ];
@@ -141,6 +148,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const relayPort = "8790";
 const lanMode = urlParams.get("mode") === "lan";
 const campaignMode = urlParams.get("campaign") === "1";
+const tutorialStorageKey = "simsystem_tutorial_complete_v1";
 const lanPlayer = Math.max(0, Math.min(3, Number(urlParams.get("player") || 0)));
 const lanToken = urlParams.get("token") || "";
 const botAdminConfig = readBotAdminConfig();
@@ -353,6 +361,21 @@ function playableAudioSources(sources) {
     if (source.endsWith(".wav")) return Boolean(audioProbe.canPlayType("audio/wav"));
     return true;
   });
+}
+
+function shouldShowTutorial() {
+  if (urlParams.get("tutorial") === "1") return true;
+  if (urlParams.get("tutorial") === "0") return false;
+  return !lanMode &&
+    localStorage.getItem(tutorialStorageKey) !== "1" &&
+    localStorage.getItem("simsystem_tutorial_hidden") !== "1";
+}
+
+function completeTutorial() {
+  tutorialVisible = false;
+  localStorage.setItem(tutorialStorageKey, "1");
+  localStorage.setItem("simsystem_tutorial_hidden", "1");
+  updateTutorial(true);
 }
 
 function updateGameFpsControl() {
@@ -3644,14 +3667,16 @@ randomScenarioButton.addEventListener("click", () => {
   resetGame({ randomSeed: true, scenario });
 });
 tutorialNext?.addEventListener("click", () => {
+  if (tutorialStep >= tutorialSteps.length - 1) {
+    completeTutorial();
+    return;
+  }
   tutorialStep = Math.min(tutorialSteps.length - 1, tutorialStep + 1);
   tutorialVisible = true;
   updateTutorial(true);
 });
 tutorialHide?.addEventListener("click", () => {
-  tutorialVisible = false;
-  localStorage.setItem("simsystem_tutorial_hidden", "1");
-  updateTutorial(true);
+  completeTutorial();
 });
 
 window.addEventListener("keydown", (evt) => {
@@ -3756,6 +3781,8 @@ async function boot() {
     appendPlayLog("engine_init", { mode: "local", seed, scenario: currentScenario, botDifficulty, snapshot: compactSnapshot() });
   }
   lastLoggedSnapshotTick = snap?.tick ?? -1;
+  tutorialVisible = shouldShowTutorial();
+  tutorialStep = 0;
   updateTutorial(true);
 }
 

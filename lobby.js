@@ -33,7 +33,7 @@ const quickJoinButton = document.querySelector("#quickJoin");
 const relayPort = "8790";
 
 const scenarios = [
-  { id: 0, name: "Training Duel", brief: "Clear two-expansion duel.", tag: "default" },
+  { id: 0, name: "Training Expansion", brief: "Clear two-expansion tutorial duel.", tag: "default" },
   { id: 1, name: "Rush Defense", brief: "Closer pressure and faster attacks.", tag: "rush" },
   { id: 2, name: "Beginner Map", brief: "Small duel map with fewer bases and easier pressure.", tag: "beginner" },
   { id: 3, name: "Random Terrain", brief: "Seeded terrain and path choices.", tag: "terrain" },
@@ -43,6 +43,8 @@ const scenarios = [
   { id: 7, name: "Wide Ring", brief: "Outer expansions and rotations.", tag: "control" },
   { id: 8, name: "Close Natural", brief: "Fast natural, early punishment.", tag: "timing" },
   { id: 9, name: "Very Hard Bot", brief: "Unfair fortress pressure.", tag: "hard" },
+  { id: 10, name: "Fixed Army Drill", brief: "Player-favored fixed units; destroy enemy units.", tag: "micro" },
+  { id: 11, name: "Production Duel", brief: "Fixed-income production fight; structures decide the winner.", tag: "macro" },
 ];
 let formDirty = false;
 let latestLobby = null;
