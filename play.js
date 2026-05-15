@@ -153,7 +153,7 @@ if (campaignMode) {
   document.title = `Frontier Run ${floor}`;
   if (brand) brand.textContent = `Frontier Run ${floor}`;
   if (homeLink) {
-    homeLink.href = "roguelike.html";
+    homeLink.href = "lobby.html";
     homeLink.textContent = "Run";
   }
 }
@@ -1382,7 +1382,7 @@ async function resetLiveGame() {
       window.location.href = next.href;
       return;
     }
-    window.location.href = "/lobby.html";
+    window.location.href = "lobby.html";
   } catch (err) {
     statusEl.textContent = `Reset failed: ${err.message}`;
   }

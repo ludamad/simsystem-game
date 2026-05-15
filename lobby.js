@@ -29,7 +29,6 @@ const copyP2Button = document.querySelector("#copyP2");
 const copyAllButton = document.querySelector("#copyAll");
 const quickAiButton = document.querySelector("#quickAi");
 const quickPartyButton = document.querySelector("#quickParty");
-const quickStoryButton = document.querySelector("#quickStory");
 const quickJoinButton = document.querySelector("#quickJoin");
 const relayPort = "8790";
 
@@ -344,7 +343,7 @@ quickAiButton?.addEventListener("click", () => {
     fps: "60",
     seed: String(Math.floor(Math.random() * 1000000) + 1),
   });
-  window.location.href = `/play.html?${params.toString()}`;
+  window.location.href = `play.html?${params.toString()}`;
 });
 quickPartyButton?.addEventListener("click", () => {
   modeEl.value = "human";
@@ -354,9 +353,6 @@ quickPartyButton?.addEventListener("click", () => {
   seedEl.value = String(Math.floor(Math.random() * 1000000) + 1);
   updateModeLabels();
   createGame();
-});
-quickStoryButton?.addEventListener("click", () => {
-  window.location.href = "/roguelike.html";
 });
 quickJoinButton?.addEventListener("click", () => joinWithCode(new Event("submit")));
 inviteCodeBox.addEventListener("click", () => {
