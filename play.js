@@ -21,6 +21,13 @@ const tutorialTitle = document.querySelector("#tutorialTitle");
 const tutorialBody = document.querySelector("#tutorialBody");
 const tutorialNext = document.querySelector("#tutorialNext");
 const tutorialHide = document.querySelector("#tutorialHide");
+const storyIntro = document.querySelector("#storyIntro");
+const storyKicker = document.querySelector("#storyKicker");
+const storyTitle = document.querySelector("#storyTitle");
+const storyBody = document.querySelector("#storyBody");
+const storyFacts = document.querySelector("#storyFacts");
+const storyStart = document.querySelector("#storyStart");
+const storySkipAll = document.querySelector("#storySkipAll");
 
 const teamColors = ["#f04d52", "#2e9cff", "#f2cf48", "#5bd37c"];
 const teamNames = ["RED", "BLUE", "GOLD", "GREEN"];
@@ -88,6 +95,32 @@ const scenarios = [
   { id: 10, name: "Fixed Army Drill", brief: "", objective: "" },
   { id: 11, name: "Production Duel", brief: "", objective: "" },
 ];
+const storyBriefings = {
+  0: {
+    kicker: "Story 1",
+    title: "First Expansion",
+    body: "This is an economy lesson. Select workers, claim a gray expansion, keep the three production slots busy, then turn the bigger economy into an army.",
+    facts: ["Workers are enabled", "Mining funds production", "Win by destroying enemy structures"],
+  },
+  2: {
+    kicker: "Story 1",
+    title: "First Expansion",
+    body: "This is the beginner economy match. Your first move is a second base, not a blind attack. Expand, keep building, then push when your army is real.",
+    facts: ["Workers are enabled", "Bot expands too", "Your production queue matters more than clicks"],
+  },
+  10: {
+    kicker: "Story 2",
+    title: "Fixed Army Drill",
+    body: "This is a pure movement fight. You start with more units than the enemy. There are no workers, no mining, and no production. Select the army, attack-move, and learn how the units trade.",
+    facts: ["Workers disabled", "Production disabled", "You have the stronger starting army", "Win by killing the enemy force"],
+  },
+  11: {
+    kicker: "Story 3",
+    title: "Production Duel",
+    body: "This is a spending race. Both sides receive fixed money over time and must produce combat units. Workers and mining are disabled. Losing your army is not game over; rebuild and destroy structures.",
+    facts: ["Workers disabled", "Fixed income for both players", "Combat production only", "Win by destroying structures"],
+  },
+};
 const audioProbe = document.createElement("audio");
 const soundFiles = {
   melee: ["assets/audio/rts_fps_pack/hit_1.wav", "assets/audio/rts_fps_pack/hit_2.wav", "assets/audio/rts_fps_pack/hit_3.wav"],
@@ -149,6 +182,7 @@ const relayPort = "8790";
 const lanMode = urlParams.get("mode") === "lan";
 const campaignMode = urlParams.get("campaign") === "1";
 const tutorialStorageKey = "simsystem_tutorial_complete_v1";
+const storyBriefingStorageKey = "simsystem_story_briefings_hidden_v1";
 const lanPlayer = Math.max(0, Math.min(3, Number(urlParams.get("player") || 0)));
 const lanToken = urlParams.get("token") || "";
 const botAdminConfig = readBotAdminConfig();
@@ -212,6 +246,7 @@ let lastCommandSoundAt = -1e9;
 let lastProductionNotice = null;
 let tutorialStep = 0;
 let tutorialVisible = false;
+let storyIntroVisible = false;
 let lastPanelUpdateAt = 0;
 let lastPanelKey = "";
 const playLogStorageKey = "simsystem_live_play_log_v1";
@@ -271,6 +306,7 @@ function parseUnlockedUnits() {
 }
 
 function isUnitUnlocked(unit) {
+  if ((currentScenario === 10 || currentScenario === 11) && unit === "worker") return false;
   return !campaignMode || unlockedUnits.has(unit);
 }
 
@@ -369,6 +405,41 @@ function shouldShowTutorial() {
   return !lanMode &&
     localStorage.getItem(tutorialStorageKey) !== "1" &&
     localStorage.getItem("simsystem_tutorial_hidden") !== "1";
+}
+
+function currentStoryBriefing() {
+  return storyBriefings[currentScenario] || null;
+}
+
+function shouldShowStoryIntro() {
+  if (urlParams.get("briefing") === "1") return Boolean(currentStoryBriefing());
+  if (urlParams.get("briefing") === "0") return false;
+  return !lanMode &&
+    Boolean(currentStoryBriefing()) &&
+    localStorage.getItem(storyBriefingStorageKey) !== "1";
+}
+
+function updateStoryIntro() {
+  const briefing = currentStoryBriefing();
+  if (!storyIntro || !briefing || !storyIntroVisible) {
+    storyIntro?.classList.add("hidden");
+    return;
+  }
+  storyIntro.classList.remove("hidden");
+  if (storyKicker) storyKicker.textContent = briefing.kicker;
+  if (storyTitle) storyTitle.textContent = briefing.title;
+  if (storyBody) storyBody.textContent = briefing.body;
+  if (storyFacts) {
+    storyFacts.innerHTML = briefing.facts.map((fact) => `<span>${fact}</span>`).join("");
+  }
+}
+
+function closeStoryIntro({ skipAll = false } = {}) {
+  storyIntroVisible = false;
+  if (skipAll) localStorage.setItem(storyBriefingStorageKey, "1");
+  updateStoryIntro();
+  tutorialVisible = shouldShowTutorial();
+  updateTutorial(true);
 }
 
 function completeTutorial() {
@@ -1367,6 +1438,7 @@ function resetGame({ randomSeed = false, scenario = currentScenario } = {}) {
   lastPlayerAction = "";
   currentScenario = scenario;
   scenarioSelect.value = String(currentScenario);
+  renderProductionButtons();
   botDifficulty = Math.max(1, Math.min(10, Number(difficultySelect.value || botDifficulty)));
   if (randomSeed) seed = Math.floor(Math.random() * 1000000);
   else seed++;
@@ -1378,6 +1450,9 @@ function resetGame({ randomSeed = false, scenario = currentScenario } = {}) {
   soundCooldowns.clear();
   resultBanner.classList.add("hidden");
   tutorialStep = 0;
+  storyIntroVisible = shouldShowStoryIntro();
+  updateStoryIntro();
+  tutorialVisible = shouldShowTutorial() && !storyIntroVisible;
   updateTutorial();
 }
 
@@ -3678,6 +3753,8 @@ tutorialNext?.addEventListener("click", () => {
 tutorialHide?.addEventListener("click", () => {
   completeTutorial();
 });
+storyStart?.addEventListener("click", () => closeStoryIntro());
+storySkipAll?.addEventListener("click", () => closeStoryIntro({ skipAll: true }));
 
 window.addEventListener("keydown", (evt) => {
   if (evt.repeat) return;
@@ -3723,7 +3800,7 @@ function loop(t) {
     pollLan();
     pollLanLobby();
     stepLanToServer();
-  } else if (Module && snap) {
+  } else if (Module && snap && !storyIntroVisible) {
     simAccumulator += dt * targetGameFps * playSpeed;
     const ticks = Math.min(Math.max(8, Math.ceil(targetGameFps / 12)), Math.floor(simAccumulator));
     if (ticks > 0) {
@@ -3781,7 +3858,9 @@ async function boot() {
     appendPlayLog("engine_init", { mode: "local", seed, scenario: currentScenario, botDifficulty, snapshot: compactSnapshot() });
   }
   lastLoggedSnapshotTick = snap?.tick ?? -1;
-  tutorialVisible = shouldShowTutorial();
+  storyIntroVisible = shouldShowStoryIntro();
+  updateStoryIntro();
+  tutorialVisible = shouldShowTutorial() && !storyIntroVisible;
   tutorialStep = 0;
   updateTutorial(true);
 }
@@ -3798,7 +3877,8 @@ function decodeBase64Json(value) {
 
 function applyBotAdminConfig() {
   const config = botAdminConfig || decodeBase64Json(urlParams.get("botAdmin"));
-  const policy = urlParams.get("botPolicy") || config?.policy || "";
+  const challengeLocksOpponent = currentScenario === 10 || currentScenario === 11;
+  const policy = challengeLocksOpponent ? "" : (urlParams.get("botPolicy") || config?.policy || "");
   if (policy) send({ type: "set_policy", player: 1, policy });
   const buildTimeScale = Number(config?.buildTimeScale ?? 1.0);
   if (Number.isFinite(buildTimeScale) && buildTimeScale > 0) {
@@ -3816,7 +3896,7 @@ function applyBotAdminConfig() {
 
 function updateTutorial(force = false) {
   if (!tutorialCard || !tutorialTitle || !tutorialBody || !tutorialNext) return;
-  if (!tutorialVisible || !snap) {
+  if (storyIntroVisible || !tutorialVisible || !snap) {
     tutorialCard.classList.add("hidden");
     return;
   }
@@ -3833,6 +3913,14 @@ function updateTutorial(force = false) {
 window.simsystemDebug = {
   snapshot: () => snap,
   controlledPlayer,
+  initLanPlayers: (nextSeed, ticks, scenario, botMask, difficulty, playerCount) => {
+    snap = ptrJson(wasm.initLanPlayers(nextSeed, ticks, scenario, botMask, difficulty, playerCount));
+    return snap;
+  },
+  step: (ticks = 1) => {
+    snap = ptrJson(wasm.step(ticks));
+    return snap;
+  },
   lan: () => ({ ...lan, packets: [...lan.packets.entries()] }),
   produce,
   send,
