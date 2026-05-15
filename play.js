@@ -3205,18 +3205,26 @@ canvas.addEventListener("pointerdown", (evt) => {
   p.pureMove = evt.ctrlKey || evt.metaKey;
   if (evt.button === 2) {
     evt.preventDefault();
-    rightClick = { x: p.x, y: p.y, pureMove: p.pureMove, pointerId: evt.pointerId };
-    drag = null;
+    rightClick = {
+      x: p.x,
+      y: p.y,
+      cx: p.x,
+      cy: p.y,
+      pureMove: p.pureMove,
+      pointerId: evt.pointerId,
+      mode: "right-candidate",
+      camera: { ...camera },
+    };
+    drag = rightClick;
     return;
   }
-  const canPanMap = !attackMode && !expandMode && !evt.shiftKey;
   drag = {
     x: p.x,
     y: p.y,
     cx: p.x,
     cy: p.y,
     box: false,
-    mode: canPanMap ? "pan-candidate" : "box",
+    mode: "box",
     camera: { ...camera },
   };
 });
@@ -3238,20 +3246,21 @@ canvas.addEventListener("pointermove", (evt) => {
   }
   const hovered = buildingAt(p);
   hoverBuildingId = hovered && hovered.owner < 0 ? hovered.id : -1;
-  if (!drag) return;
-  drag.cx = p.x;
-  drag.cy = p.y;
-  const moved = Math.hypot(drag.cx - drag.x, drag.cy - drag.y);
-  if (drag.mode === "pan-candidate" && moved > 8) {
-    drag.mode = "pan";
+  const activeDrag = rightClick || drag;
+  if (!activeDrag) return;
+  activeDrag.cx = p.x;
+  activeDrag.cy = p.y;
+  const moved = Math.hypot(activeDrag.cx - activeDrag.x, activeDrag.cy - activeDrag.y);
+  if (activeDrag.mode === "right-candidate" && moved > 8) {
+    activeDrag.mode = "pan";
     canvas.classList.add("dragging");
   }
-  if (drag.mode === "pan") {
-    panCameraFromDrag(drag, p);
+  if (activeDrag.mode === "pan") {
+    panCameraFromDrag(activeDrag, p);
     evt.preventDefault();
     return;
   }
-  drag.box = moved > 8;
+  if (activeDrag.mode === "box") activeDrag.box = moved > 8;
 });
 
 canvas.addEventListener("dblclick", (evt) => {
@@ -3294,6 +3303,13 @@ canvas.addEventListener("pointerup", (evt) => {
   p.pureMove = evt.ctrlKey || evt.metaKey;
   if (evt.button === 2 || rightClick) {
     evt.preventDefault();
+    if (rightClick?.mode === "pan") {
+      lastContextMenuOrderAt = performance.now();
+      rightClick = null;
+      drag = null;
+      canvas.classList.remove("dragging");
+      return;
+    }
     if (performance.now() - lastContextMenuOrderAt < 120) {
       rightClick = null;
       drag = null;
@@ -3363,6 +3379,12 @@ canvas.addEventListener("pointercancel", (evt) => {
 canvas.addEventListener("contextmenu", (evt) => {
   evt.preventDefault();
   if (performance.now() < suppressPointerUntil) return;
+  if (rightClick?.mode === "pan" || performance.now() - lastContextMenuOrderAt < 120) {
+    rightClick = null;
+    drag = null;
+    canvas.classList.remove("dragging");
+    return;
+  }
   const p = clientPoint(evt);
   p.pureMove = evt.ctrlKey || evt.metaKey;
   p.rightClick = true;
