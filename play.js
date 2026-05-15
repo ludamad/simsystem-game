@@ -95,30 +95,96 @@ const scenarios = [
   { id: 10, name: "Fixed Army Drill", brief: "", objective: "" },
   { id: 11, name: "Production Duel", brief: "", objective: "" },
 ];
+const scenarioUnlocks = {
+  0: ["worker", "warrior"],
+  1: ["worker", "warrior", "archer"],
+  2: ["worker", "warrior", "archer"],
+  3: ["worker", "warrior", "archer", "bomber"],
+  4: ["worker", "warrior", "archer", "vulture"],
+  5: ["worker", "warrior", "archer", "siege"],
+  6: ["worker", "warrior", "archer", "vulture", "siege"],
+  7: ["worker", "warrior", "archer", "vulture", "siege", "storm"],
+  8: ["worker", "warrior", "archer", "vulture", "skirmisher"],
+  9: ["worker", "warrior", "archer", "bomber", "siege", "vulture", "storm", "skirmisher"],
+  10: [],
+  11: ["warrior", "archer", "vulture"],
+};
+function unitLabels(units) {
+  if (!units.length) return "No production";
+  return units.map((unit) => productionByUnitName.get(unit)?.label || unit).join(", ");
+}
 const storyBriefings = {
   0: {
     kicker: "Story 1",
     title: "First Expansion",
     body: "This is an economy lesson. Select workers, claim a gray expansion, keep the three production slots busy, then turn the bigger economy into an army.",
-    facts: ["Workers are enabled", "Mining funds production", "Win by destroying enemy structures"],
+    facts: ["Workers are enabled", "Unlocked: Worker, Warrior", "Win by destroying enemy structures"],
+  },
+  1: {
+    kicker: "Story 2",
+    title: "Hold the Rush",
+    body: "The enemy pressure arrives early. You have a small roster and a short map. Spend continuously, keep workers alive, and use archers behind warriors instead of chasing with workers.",
+    facts: ["Unlocked: Worker, Warrior, Archer", "Enemy attacks sooner", "Win by stabilizing and counterattacking"],
   },
   2: {
-    kicker: "Story 1",
+    kicker: "Story 3",
     title: "First Expansion",
     body: "This is the beginner economy match. Your first move is a second base, not a blind attack. Expand, keep building, then push when your army is real.",
-    facts: ["Workers are enabled", "Bot expands too", "Your production queue matters more than clicks"],
+    facts: ["Unlocked: Worker, Warrior, Archer", "Bot expands too", "Your production queue matters more than clicks"],
+  },
+  3: {
+    kicker: "Story 4",
+    title: "Broken Ground",
+    body: "The map shape now matters. Use the same economy plan, but watch the pathing lanes before committing your army. Bombers are unlocked as a punish tool against clumped forces.",
+    facts: ["Unlocked: Worker, Warrior, Archer, Bomber", "Seeded terrain", "Take fights on open angles"],
+  },
+  4: {
+    kicker: "Story 5",
+    title: "Harass Defense",
+    body: "Fast raiders are now part of the game. Keep production moving, protect the mineral line, and use your own vultures to punish exposed workers instead of walking into static defense.",
+    facts: ["Unlocked: Worker, Warrior, Archer, Vulture", "Enemy raids workers", "Counter-harass wins time"],
+  },
+  5: {
+    kicker: "Story 6",
+    title: "Siege Break",
+    body: "Static defenses and bases are harder to crack head-on. Siege is unlocked for structure damage, but it is slow; screen it with cheaper units and do not feed it unsupported.",
+    facts: ["Unlocked: Worker, Warrior, Archer, Siege", "Break structures deliberately", "Protect expensive units"],
+  },
+  6: {
+    kicker: "Story 7",
+    title: "Back Bases",
+    body: "Safer rear expansions create longer games. You can field vultures and siege together now, so balance economy growth with enough army to avoid giving the enemy free map control.",
+    facts: ["Unlocked: Worker, Warrior, Archer, Vulture, Siege", "Longer crossing distance", "Greed needs scouting pressure"],
+  },
+  7: {
+    kicker: "Story 8",
+    title: "Wide Ring",
+    body: "The outer bases matter. Storm unlocks area control, which is strongest when enemies clump near bases. Rotate through the map instead of always attacking the closest main.",
+    facts: ["Unlocked: Worker, Warrior, Archer, Vulture, Siege, Storm", "Outer expansion routes", "Punish clumps and rotations"],
+  },
+  8: {
+    kicker: "Story 9",
+    title: "Close Natural",
+    body: "The second base is close enough to be both tempting and punishable. Skirmishers unlock mobile poke; use them to pressure weak spots while your core army protects production.",
+    facts: ["Unlocked: Worker, Warrior, Archer, Vulture, Skirmisher", "Fast natural timing", "Mobile units should not dive static defense"],
+  },
+  9: {
+    kicker: "Story 10",
+    title: "Very Hard Bot",
+    body: "This is the full roster test against the hardest scripted opponent. Treat the early game as survival, then use the unit mix that fits what the enemy actually built.",
+    facts: ["Unlocked: Full roster", "High-pressure opponent", "Win by adapting composition"],
   },
   10: {
-    kicker: "Story 2",
+    kicker: "Story 11",
     title: "Fixed Army Drill",
     body: "This is a pure movement fight. You start with more units than the enemy. There are no workers, no mining, and no production. Select the army, attack-move, and learn how the units trade.",
-    facts: ["Workers disabled", "Production disabled", "You have the stronger starting army", "Win by killing the enemy force"],
+    facts: ["Unlocked: no production", "Workers disabled", "Production disabled", "Win by killing the enemy force"],
   },
   11: {
-    kicker: "Story 3",
+    kicker: "Story 12",
     title: "Production Duel",
     body: "This is a spending race. Both sides receive fixed money over time and must produce combat units. Workers and mining are disabled. Losing your army is not game over; rebuild and destroy structures.",
-    facts: ["Workers disabled", "Fixed income for both players", "Combat production only", "Win by destroying structures"],
+    facts: ["Unlocked: Warrior, Archer, Vulture", "Workers disabled", "Fixed income for both players", "Win by destroying structures"],
   },
 };
 const audioProbe = document.createElement("audio");
@@ -181,6 +247,10 @@ const urlParams = new URLSearchParams(window.location.search);
 const relayPort = "8790";
 const lanMode = urlParams.get("mode") === "lan";
 const campaignMode = urlParams.get("campaign") === "1";
+function selectedScenarioId() {
+  return Math.max(0, Math.min(scenarios.length - 1, Number(urlParams.get("scenario") || 0)));
+}
+const storyMode = urlParams.get("story") === "1" || campaignMode || selectedScenarioId() >= 10;
 const tutorialStorageKey = "simsystem_tutorial_complete_v1";
 const storyBriefingStorageKey = "simsystem_story_briefings_hidden_v1";
 const lanPlayer = Math.max(0, Math.min(3, Number(urlParams.get("player") || 0)));
@@ -291,6 +361,9 @@ function controlledPlayer() {
 
 function parseUnlockedUnits() {
   const all = new Set(productionUnits.map((item) => item.unit));
+  const scenarioId = selectedScenarioId();
+  const scenarioUnits = scenarioUnlocks[scenarioId];
+  if (scenarioUnits && storyMode && !urlParams.has("unlocks")) return new Set(scenarioUnits);
   if (!campaignMode) return all;
   const requested = (urlParams.get("unlocks") || "")
     .split(",")
@@ -306,8 +379,7 @@ function parseUnlockedUnits() {
 }
 
 function isUnitUnlocked(unit) {
-  if ((currentScenario === 10 || currentScenario === 11) && unit === "worker") return false;
-  return !campaignMode || unlockedUnits.has(unit);
+  return unlockedUnits.has(unit);
 }
 
 function readBotAdminConfig() {
@@ -408,6 +480,7 @@ function shouldShowTutorial() {
 }
 
 function currentStoryBriefing() {
+  if (!storyMode && urlParams.get("briefing") !== "1") return null;
   return storyBriefings[currentScenario] || null;
 }
 
@@ -430,7 +503,12 @@ function updateStoryIntro() {
   if (storyTitle) storyTitle.textContent = briefing.title;
   if (storyBody) storyBody.textContent = briefing.body;
   if (storyFacts) {
-    storyFacts.innerHTML = briefing.facts.map((fact) => `<span>${fact}</span>`).join("");
+    const unlockFact = `Production: ${unitLabels([...unlockedUnits])}`;
+    const facts = [...briefing.facts];
+    if (!facts.some((fact) => fact.startsWith("Unlocked:") || fact.startsWith("Production:"))) {
+      facts.unshift(unlockFact);
+    }
+    storyFacts.innerHTML = facts.map((fact) => `<span>${fact}</span>`).join("");
   }
 }
 
