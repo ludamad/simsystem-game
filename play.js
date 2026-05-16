@@ -256,7 +256,7 @@ const storyBriefingStorageKey = "simsystem_story_briefings_hidden_v1";
 const lanPlayer = Math.max(0, Math.min(3, Number(urlParams.get("player") || 0)));
 const lanToken = urlParams.get("token") || "";
 const botAdminConfig = readBotAdminConfig();
-const unlockedUnits = parseUnlockedUnits();
+let unlockedUnits = parseUnlockedUnits();
 document.body.classList.toggle("campaign-mode", campaignMode);
 if (campaignMode) {
   const floor = Number(urlParams.get("floor") || 1);
@@ -520,6 +520,34 @@ function closeStoryIntro({ skipAll = false } = {}) {
   updateTutorial(true);
 }
 
+function nextStoryScenarioId() {
+  return currentScenario < scenarios.length - 1 ? currentScenario + 1 : -1;
+}
+
+function storyProgressKey() {
+  return "simsystem_story_progress_v1";
+}
+
+function recordStoryVictory() {
+  if (!storyMode) return;
+  const next = nextStoryScenarioId();
+  const unlocked = next >= 0 ? next : currentScenario;
+  const previous = Number(localStorage.getItem(storyProgressKey()) || 0);
+  localStorage.setItem(storyProgressKey(), String(Math.max(previous, unlocked)));
+}
+
+function goToNextStoryPhase() {
+  const next = nextStoryScenarioId();
+  if (next < 0) return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("scenario", String(next));
+  url.searchParams.set("story", "1");
+  url.searchParams.set("briefing", "1");
+  url.searchParams.set("tutorial", "0");
+  url.searchParams.set("seed", String(Math.floor(Math.random() * 1000000) + 1));
+  window.location.href = url.toString();
+}
+
 function completeTutorial() {
   tutorialVisible = false;
   localStorage.setItem(tutorialStorageKey, "1");
@@ -646,7 +674,7 @@ function soundForEffect(kind) {
 }
 
 function soundForEvent(kind) {
-  if (kind === "arrow" || kind === "shot" || kind === "tower") return "shot";
+  if (kind === "arrow" || kind === "shot" || kind === "tower" || kind === "main_shot") return "shot";
   if (kind === "melee" || kind === "slash" || kind === "attack") return "melee";
   if (kind === "siege" || kind === "storm" || kind === "explode") return "ability";
   return null;
@@ -1515,6 +1543,7 @@ function resetGame({ randomSeed = false, scenario = currentScenario } = {}) {
   expandMode = false;
   lastPlayerAction = "";
   currentScenario = scenario;
+  unlockedUnits = parseUnlockedUnits();
   scenarioSelect.value = String(currentScenario);
   renderProductionButtons();
   botDifficulty = Math.max(1, Math.min(10, Number(difficultySelect.value || botDifficulty)));
@@ -1527,6 +1556,7 @@ function resetGame({ randomSeed = false, scenario = currentScenario } = {}) {
   lastLiveAudioTick = snap?.tick ?? -1;
   soundCooldowns.clear();
   resultBanner.classList.add("hidden");
+  resultBanner.dataset.resultKey = "";
   tutorialStep = 0;
   storyIntroVisible = shouldShowStoryIntro();
   updateStoryIntro();
@@ -2873,6 +2903,9 @@ function drawEffects() {
     const color = teamColors[e.owner] || "#fff";
     if (e.kind === "strike") {
       drawSlashEffect(a.x, a.y, b.x, b.y, color, ttl);
+    } else if (e.kind === "main_shot") {
+      drawBeamEffect(a.x, a.y, b.x, b.y, "#fff2a8", 6.4, 28, ttl, true);
+      drawExplosionEffect(b.x, b.y, 22, color, ttl);
     } else if (e.kind === "siege_shell" || e.kind === "tank_shot") {
       drawBeamEffect(a.x, a.y, b.x, b.y, "#f6d57a", 5.0, 22, ttl, true);
       drawExplosionEffect(b.x, b.y, 18, color, ttl);
@@ -3314,18 +3347,33 @@ function updateProductionAffordability() {
 
 function updateResultBanner() {
   const own = controlledPlayer();
-  const ownAlive = (snap.buildings || []).some((b) => b.owner === own && b.alive);
-  const enemyAlive = (snap.buildings || []).some((b) => b.owner >= 0 && b.owner !== own && b.alive);
+  const unitEliminationUi = currentScenario === 10;
+  const ownAlive = unitEliminationUi
+    ? (snap.units || []).some((u) => u.owner === own && u.alive !== false)
+    : (snap.buildings || []).some((b) => b.owner === own && b.alive && b.kind === "main");
+  const enemyAlive = unitEliminationUi
+    ? (snap.units || []).some((u) => u.owner >= 0 && u.owner !== own && u.alive !== false)
+    : (snap.buildings || []).some((b) => b.owner >= 0 && b.owner !== own && b.alive && b.kind === "main");
   if (ownAlive && enemyAlive) {
     resultBanner.classList.add("hidden");
+    resultBanner.dataset.resultKey = "";
     return;
   }
   const won = ownAlive && !enemyAlive;
   const lost = !ownAlive && enemyAlive;
+  if (won) recordStoryVictory();
+  const next = won && storyMode ? nextStoryScenarioId() : -1;
+  const resultKey = `${won ? "win" : lost ? "loss" : "draw"}:${currentScenario}:${next}`;
+  if (resultBanner.dataset.resultKey === resultKey) return;
+  resultBanner.dataset.resultKey = resultKey;
   resultBanner.classList.remove("hidden", "win", "loss");
   resultBanner.classList.add(won ? "win" : lost ? "loss" : "draw");
   const rematchText = lanMode ? " Rematch starts shortly." : "";
-  resultBanner.innerHTML = `<strong>${won ? "Victory" : lost ? "Defeat" : "Base Trade"}</strong><span>${won ? "All enemy buildings destroyed." : lost ? "All owned buildings destroyed." : "No owned buildings remain."}${rematchText}</span>`;
+  const nextButton = next >= 0 ? `<button id="nextStoryPhase" type="button">Next phase</button>` : "";
+  const winText = unitEliminationUi ? "Enemy force destroyed." : "Enemy main base destroyed.";
+  const lossText = unitEliminationUi ? "Your force was destroyed." : "Your main base was destroyed.";
+  const drawText = unitEliminationUi ? "No armies remain." : "No main bases remain.";
+  resultBanner.innerHTML = `<strong>${won ? "Victory" : lost ? "Defeat" : "Base Trade"}</strong><span>${won ? winText : lost ? lossText : drawText}${rematchText}</span>${nextButton}`;
   if (lanMode && lan.started && controlledPlayer() === 0 && !lan.autoRematchScheduled) {
     lan.autoRematchScheduled = true;
     setTimeout(() => resetLiveGame(), 4500);
@@ -3833,6 +3881,9 @@ tutorialHide?.addEventListener("click", () => {
 });
 storyStart?.addEventListener("click", () => closeStoryIntro());
 storySkipAll?.addEventListener("click", () => closeStoryIntro({ skipAll: true }));
+resultBanner?.addEventListener("click", (evt) => {
+  if (evt.target?.id === "nextStoryPhase") goToNextStoryPhase();
+});
 
 window.addEventListener("keydown", (evt) => {
   if (evt.repeat) return;

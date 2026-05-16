@@ -2381,6 +2381,21 @@ button.ready {
   color: #ff7676;
 }
 
+.result-banner button {
+  margin-top: 6px;
+  padding: 8px 14px;
+  border: 1px solid rgba(125, 255, 172, 0.52);
+  border-radius: 6px;
+  background: rgba(36, 128, 76, 0.92);
+  color: #f4fff8;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.result-banner button:hover {
+  background: rgba(46, 160, 92, 0.98);
+}
+
 .lan-start-gate {
   position: fixed;
   inset: 0;

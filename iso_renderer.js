@@ -261,7 +261,7 @@
     const p = env.worldToScreen(building.x, building.y, 0);
     const x = p.x;
     const y = p.y;
-    const size = isMain ? 34 : 28;
+    const size = isMain ? 43 : 25;
     const half = size / 2;
     const colors = env.colors || [];
     const ownerColor = building.owner >= 0 ? colors[building.owner] : "#c8c5bc";
@@ -274,7 +274,7 @@
     const claimRatio = Math.max(0, Math.min(1, Number(building.claim_progress || 0) / claimRequired));
     const isExpansionSite = !isMain && building.owner < 0;
     const hpRatio = Math.max(0, Math.min(1, building.hp / Math.max(1, building.max_hp)));
-    const blockHeight = isMain ? 22 : 15;
+    const blockHeight = isMain ? 34 : 12;
     const idleReady = building.owner >= 0 && Number(building.pending_card_id || 0) === 0;
     const idlePulse = 0.5 + 0.5 * Math.sin((env.animTime || 0) * 2.4 + (building.id || 0) * 0.7);
 
