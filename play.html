@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Simsystem Live</title>
-    <link rel="stylesheet" href="styles.css?v=play-ux-17">
+    <link rel="stylesheet" href="styles.css?v=play-ux-18">
   </head>
   <body>
     <main class="app live-app">
@@ -51,6 +51,18 @@
         <canvas id="arena" width="960" height="640"></canvas>
         <div id="resultBanner" class="result-banner hidden"></div>
         <div id="lanStartGate" class="lan-start-gate hidden"></div>
+        <section id="startMenu" class="start-menu hidden" aria-label="Start game">
+          <div class="start-menu-panel">
+            <div class="story-kicker">Simsystem</div>
+            <h1>Choose a Match</h1>
+            <p>Play the guided story, start a quick bot duel, or invite people.</p>
+            <div class="start-menu-actions">
+              <a class="primary" href="play.html?scenario=0&amp;difficulty=3&amp;story=1&amp;briefing=1">Story</a>
+              <a href="play.html?scenario=0&amp;difficulty=7">Play vs Bot</a>
+              <a href="lobby.html">Play People</a>
+            </div>
+          </div>
+        </section>
         <section id="tutorialCard" class="tutorial-card hidden" aria-label="Tutorial">
           <div class="tutorial-kicker">First game</div>
           <h2 id="tutorialTitle"></h2>
@@ -82,6 +94,6 @@
     </main>
     <script src="simsystem_wasm.js"></script>
     <script src="iso_renderer.js?v=shared-iso-2"></script>
-    <script src="play.js?v=play-ux-17"></script>
+    <script src="play.js?v=play-ux-18"></script>
   </body>
 </html>

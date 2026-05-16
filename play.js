@@ -16,6 +16,7 @@ const readyButton = document.querySelector("#readyButton");
 const soundButton = document.querySelector("#sound");
 const resultBanner = document.querySelector("#resultBanner");
 const lanStartGate = document.querySelector("#lanStartGate");
+const startMenu = document.querySelector("#startMenu");
 const tutorialCard = document.querySelector("#tutorialCard");
 const tutorialTitle = document.querySelector("#tutorialTitle");
 const tutorialBody = document.querySelector("#tutorialBody");
@@ -283,6 +284,7 @@ const unitVisuals = new Map();
 const productionButtons = new Map();
 const displayUnitsScratch = [];
 const drawThingsScratch = [];
+let startMenuVisible = bareStartPage;
 let selected = new Set();
 let controlGroups = Array.from({ length: 10 }, () => new Set());
 let camera = { x: 0, y: 0, zoom: 1.04 };
@@ -491,7 +493,7 @@ function currentStoryBriefing() {
 }
 
 function shouldShowStoryIntro() {
-  if (bareStartPage) return Boolean(currentStoryBriefing());
+  if (bareStartPage) return false;
   if (urlParams.get("briefing") === "1") return Boolean(currentStoryBriefing());
   if (urlParams.get("briefing") === "0") return false;
   return !lanMode &&
@@ -525,6 +527,11 @@ function closeStoryIntro({ skipAll = false } = {}) {
   updateStoryIntro();
   tutorialVisible = shouldShowTutorial();
   updateTutorial(true);
+}
+
+function updateStartMenu() {
+  if (!startMenu) return;
+  startMenu.classList.toggle("hidden", !startMenuVisible);
 }
 
 function nextStoryScenarioId() {
@@ -1565,6 +1572,8 @@ function resetGame({ randomSeed = false, scenario = currentScenario } = {}) {
   resultBanner.classList.add("hidden");
   resultBanner.dataset.resultKey = "";
   tutorialStep = 0;
+  startMenuVisible = false;
+  updateStartMenu();
   storyIntroVisible = shouldShowStoryIntro();
   updateStoryIntro();
   tutorialVisible = shouldShowTutorial() && !storyIntroVisible;
@@ -3936,7 +3945,7 @@ function loop(t) {
     pollLan();
     pollLanLobby();
     stepLanToServer();
-  } else if (Module && snap && !storyIntroVisible) {
+  } else if (Module && snap && !startMenuVisible && !storyIntroVisible) {
     simAccumulator += dt * targetGameFps * playSpeed;
     const ticks = Math.min(Math.max(8, Math.ceil(targetGameFps / 12)), Math.floor(simAccumulator));
     if (ticks > 0) {
@@ -3995,8 +4004,9 @@ async function boot() {
   }
   lastLoggedSnapshotTick = snap?.tick ?? -1;
   storyIntroVisible = shouldShowStoryIntro();
+  updateStartMenu();
   updateStoryIntro();
-  tutorialVisible = shouldShowTutorial() && !storyIntroVisible;
+  tutorialVisible = shouldShowTutorial() && !startMenuVisible && !storyIntroVisible;
   tutorialStep = 0;
   updateTutorial(true);
 }
@@ -4032,7 +4042,7 @@ function applyBotAdminConfig() {
 
 function updateTutorial(force = false) {
   if (!tutorialCard || !tutorialTitle || !tutorialBody || !tutorialNext) return;
-  if (storyIntroVisible || !tutorialVisible || !snap) {
+  if (startMenuVisible || storyIntroVisible || !tutorialVisible || !snap) {
     tutorialCard.classList.add("hidden");
     return;
   }
