@@ -244,13 +244,14 @@ const tutorialSteps = [
 ];
 const bounds = 190;
 const urlParams = new URLSearchParams(window.location.search);
+const bareStartPage = window.location.search.length === 0;
 const relayPort = "8790";
 const lanMode = urlParams.get("mode") === "lan";
 const campaignMode = urlParams.get("campaign") === "1";
 function selectedScenarioId() {
   return Math.max(0, Math.min(scenarios.length - 1, Number(urlParams.get("scenario") || 0)));
 }
-const storyMode = urlParams.get("story") === "1" || campaignMode || selectedScenarioId() >= 10;
+const storyMode = bareStartPage || urlParams.get("story") === "1" || campaignMode || selectedScenarioId() >= 10;
 const tutorialStorageKey = "simsystem_tutorial_complete_v1";
 const storyBriefingStorageKey = "simsystem_story_briefings_hidden_v1";
 const lanPlayer = Math.max(0, Math.min(3, Number(urlParams.get("player") || 0)));
@@ -268,6 +269,11 @@ if (campaignMode) {
     homeLink.href = "lobby.html";
     homeLink.textContent = "Run";
   }
+}
+if (bareStartPage) {
+  document.title = "Simsystem Story";
+  const brand = document.querySelector(".live-toolbar .brand");
+  if (brand) brand.textContent = "Simsystem Story";
 }
 
 let Module = null;
@@ -304,7 +310,7 @@ let playSpeed = Math.max(0.1, Math.min(3, Number(urlParams.get("speed") || speed
 let targetGameFps = Math.max(15, Math.min(120, Number(urlParams.get("fps") || localStorage.getItem("simsystem_game_fps") || gameFpsSlider?.value || 60)));
 let seed = Math.max(1, Math.min(999999, Number(urlParams.get("seed") || botAdminConfig?.seed || Math.floor(Math.random() * 100000))));
 let currentScenario = Math.max(0, Math.min(scenarios.length - 1, Number(urlParams.get("scenario") || botAdminConfig?.scenario || 0)));
-let botDifficulty = Math.max(1, Math.min(10, Number(urlParams.get("difficulty") || botAdminConfig?.difficulty || difficultySelect?.value || 3)));
+let botDifficulty = Math.max(1, Math.min(10, Number(urlParams.get("difficulty") || botAdminConfig?.difficulty || (bareStartPage ? 3 : difficultySelect?.value) || 3)));
 let lastPlayerAction = "";
 let soundEnabled = false;
 let audioUnlocked = false;
@@ -485,6 +491,7 @@ function currentStoryBriefing() {
 }
 
 function shouldShowStoryIntro() {
+  if (bareStartPage) return Boolean(currentStoryBriefing());
   if (urlParams.get("briefing") === "1") return Boolean(currentStoryBriefing());
   if (urlParams.get("briefing") === "0") return false;
   return !lanMode &&
