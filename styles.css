@@ -2000,6 +2000,24 @@ button.ready {
   touch-action: none;
 }
 
+.pixi-arena {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  z-index: 0;
+  pointer-events: none;
+  background: #111a14;
+}
+
+body.pixi-renderer #arena {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+}
+
 #arena.dragging {
   cursor: grabbing;
 }
@@ -2976,14 +2994,14 @@ body.campaign-mode .live-toolbar {
   right: 0;
   bottom: 0;
   width: 100vw;
-  min-height: 118px;
+  min-height: 72px;
   transform: none;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   align-items: stretch;
   justify-content: stretch;
-  gap: 9px;
-  padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+  gap: 6px;
+  padding: 7px 10px max(7px, env(safe-area-inset-bottom));
   border-width: 1px 0 0;
   border-radius: 0;
   background:
@@ -2993,14 +3011,14 @@ body.campaign-mode .live-toolbar {
 }
 
 .production-readout {
+  display: none;
   position: fixed;
   left: 50%;
-  bottom: 104px;
+  bottom: 76px;
   z-index: 6;
-  width: min(720px, calc(100vw - 430px));
-  min-height: 42px;
+  width: min(600px, calc(100vw - 470px));
+  min-height: 36px;
   transform: translateX(-50%);
-  display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
@@ -3076,40 +3094,40 @@ body.campaign-mode .live-toolbar {
 .production-dock .produce-button {
   display: grid;
   min-width: 0;
-  min-height: 82px;
+  min-height: 56px;
   grid-template-columns: auto auto minmax(0, 1fr);
   grid-template-rows: auto auto auto;
   align-content: center;
   justify-items: start;
-  gap: 2px 9px;
-  padding: 8px 10px;
+  gap: 1px 7px;
+  padding: 6px 8px;
 }
 
 .production-dock .produce-button .hotkey {
   grid-column: 1;
   grid-row: 1 / span 3;
-  width: 28px;
-  height: 28px;
-  font-size: 12px;
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
 }
 
 .production-dock .produce-button .unit-chip {
   grid-column: 2;
   grid-row: 1 / span 3;
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
 }
 
 .production-dock .produce-button .unit-name {
   grid-column: 3;
   grid-row: 1;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .production-dock .produce-button .cost,
 .production-dock .produce-button .build-time {
   grid-column: 3;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .production-dock .produce-button .cost {
@@ -3122,7 +3140,7 @@ body.campaign-mode .live-toolbar {
 
 .panel {
   top: 76px;
-  bottom: 88px;
+  bottom: 70px;
   width: min(430px, calc(100vw - 32px));
   opacity: 0.68;
 }

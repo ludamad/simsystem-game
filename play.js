@@ -246,7 +246,15 @@ const tutorialSteps = [
 const bounds = 190;
 const urlParams = new URLSearchParams(window.location.search);
 const renderProfileEnabled = urlParams.get("profile") === "1" || localStorage.getItem("simsystem_render_profile") === "1";
-const renderPixelRatioCap = Math.max(1, Math.min(2, Number(urlParams.get("renderDpr") || localStorage.getItem("simsystem_render_dpr") || 1.0)));
+const rendererMode = String(urlParams.get("renderer") || "pixi").toLowerCase();
+let usePixiRenderer = rendererMode !== "canvas";
+const requestedRenderPixelRatioCap = Math.max(1, Math.min(2, Number(
+  urlParams.get("renderDpr") ||
+  localStorage.getItem("simsystem_render_dpr") ||
+  window.devicePixelRatio ||
+  2
+)));
+const renderPixelRatioCap = requestedRenderPixelRatioCap;
 const bareStartPage = window.location.search.length === 0;
 const relayPort = "8790";
 const lanMode = urlParams.get("mode") === "lan";
@@ -262,6 +270,7 @@ const lanToken = urlParams.get("token") || "";
 const botAdminConfig = readBotAdminConfig();
 let unlockedUnits = parseUnlockedUnits();
 document.body.classList.toggle("campaign-mode", campaignMode);
+document.body.classList.toggle("pixi-renderer", usePixiRenderer);
 if (campaignMode) {
   const floor = Number(urlParams.get("floor") || 1);
   const brand = document.querySelector(".live-toolbar .brand");
@@ -292,6 +301,8 @@ let controlGroups = Array.from({ length: 10 }, () => new Set());
 let camera = { x: 0, y: 0, zoom: 1.04 };
 let groundCache = null;
 let groundCacheKey = "";
+let pixiWorldRenderer = null;
+let mapViewportCache = null;
 let drag = null;
 let rightClick = null;
 const activePointers = new Map();
@@ -565,7 +576,7 @@ function playableAudioSources(sources) {
 function shouldShowTutorial() {
   if (urlParams.get("tutorial") === "1") return true;
   if (urlParams.get("tutorial") === "0") return false;
-  return !lanMode &&
+  return !lanMode && storyMode &&
     localStorage.getItem(tutorialStorageKey) !== "1" &&
     localStorage.getItem("simsystem_tutorial_hidden") !== "1";
 }
@@ -874,6 +885,55 @@ function resizeCanvas() {
     canvas.height = h;
     groundCacheKey = "";
   }
+  updateMapViewport();
+}
+
+function canvasUiScale() {
+  const rect = canvas.getBoundingClientRect();
+  return Math.max(1, canvas.width / Math.max(1, rect.width));
+}
+
+function uiPx(value) {
+  return value * canvasUiScale();
+}
+
+function overlayRect(el) {
+  if (!el || el.classList?.contains("hidden")) return null;
+  const rect = el.getBoundingClientRect();
+  if (rect.width <= 1 || rect.height <= 1) return null;
+  const style = window.getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity || 1) <= 0.01) return null;
+  return rect;
+}
+
+function updateMapViewport() {
+  const rect = canvas.getBoundingClientRect();
+  const ratioX = canvas.width / Math.max(1, rect.width);
+  const ratioY = canvas.height / Math.max(1, rect.height);
+  const padX = 18 * ratioX;
+  const padY = 18 * ratioY;
+  let left = padX;
+  let top = padY;
+  let right = canvas.width - padX;
+  let bottom = canvas.height - padY;
+
+  const toolbarRect = overlayRect(document.querySelector(".live-toolbar"));
+  if (toolbarRect) top = Math.max(top, (toolbarRect.bottom - rect.top + 10) * ratioY);
+  const dockRect = overlayRect(productionBar);
+  if (dockRect) bottom = Math.min(bottom, (dockRect.top - rect.top - 12) * ratioY);
+  const panelRect = overlayRect(document.querySelector(".live-panel"));
+  if (panelRect && panelRect.left > rect.left + rect.width * 0.50) {
+    right = Math.min(right, (panelRect.left - rect.left - 18) * ratioX);
+  }
+
+  if (right <= left + 64 * ratioX) right = Math.min(canvas.width - padX, left + 64 * ratioX);
+  if (bottom <= top + 64 * ratioY) bottom = Math.min(canvas.height - padY, top + 64 * ratioY);
+  mapViewportCache = { left, top, right, bottom, width: right - left, height: bottom - top };
+  return mapViewportCache;
+}
+
+function mapViewport() {
+  return mapViewportCache || updateMapViewport();
 }
 
 function scale() {
@@ -904,6 +964,62 @@ function screenToWorld(x, y) {
     x: camera.x + (sx + sy) * 0.5,
     y: camera.y + (sy - sx) * 0.5,
   };
+}
+
+function isoDepth(x, y, bias = 0) {
+  return Number(x || 0) + Number(y || 0) + bias;
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-dynamic-src="${src}"]`);
+    if (existing) {
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", reject, { once: true });
+      if (existing.dataset.loaded === "1") resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = false;
+    script.dataset.dynamicSrc = src;
+    script.addEventListener("load", () => {
+      script.dataset.loaded = "1";
+      resolve();
+    }, { once: true });
+    script.addEventListener("error", () => reject(new Error(`failed to load ${src}`)), { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function initWorldRenderer() {
+  if (!usePixiRenderer) return;
+  if (!window.PIXI) await loadScriptOnce("pixi.min.js?v=8.18.1");
+  if (!window.SimPixiWorldRenderer) await loadScriptOnce("pixi_world_renderer.js?v=pixi-8");
+  if (!window.SimPixiWorldRenderer) {
+    usePixiRenderer = false;
+    document.body.classList.remove("pixi-renderer");
+    document.body.classList.add("canvas-renderer");
+    return;
+  }
+  try {
+    pixiWorldRenderer = await window.SimPixiWorldRenderer.create({
+      stageEl: document.querySelector(".stage"),
+      inputCanvas: canvas,
+      worldToScreen,
+      getRotatedUnitSprite,
+      getBuildingSprite: getPixiBuildingSprite,
+    });
+    document.body.classList.add("pixi-renderer");
+    document.body.classList.remove("canvas-renderer");
+  } catch (err) {
+    console.warn("Pixi renderer unavailable; falling back to canvas", err);
+    reportClientError(err, "pixi_init");
+    pixiWorldRenderer = null;
+    usePixiRenderer = false;
+    document.body.classList.remove("pixi-renderer");
+    document.body.classList.add("canvas-renderer");
+  }
 }
 
 function clampZoom(value) {
@@ -1926,6 +2042,80 @@ function playIsoEnv() {
   };
 }
 
+const pixiBuildingSpriteCache = new Map();
+const BUILDING_SPRITE_DPR = renderPixelRatioCap;
+
+function pixiBuildingSpriteKey(b) {
+  const hpRatio = Math.max(0, Math.min(1, Number(b.hp || 0) / Math.max(1, Number(b.max_hp || 1))));
+  const claimRatio = Math.max(0, Math.min(1, Number(b.claim_progress || 0) / Math.max(1, Number(b.claim_required || 1))));
+  const prodRatio = productionProgress(b);
+  return [
+    b.id,
+    b.kind,
+    b.owner,
+    b.static_defense_level,
+    Number(b.pending_card_id || 0),
+    Math.round(prodRatio * 24),
+    Number(b.claim_owner ?? b.human_claim_intent_owner ?? -1),
+    Math.round(claimRatio * 24),
+    Math.round(hpRatio * 32),
+    b.id === hoverBuildingId ? 1 : 0,
+  ].join("|");
+}
+
+function getPixiBuildingSprite(b) {
+  if (!b?.alive) return null;
+  const key = pixiBuildingSpriteKey(b);
+  const cached = pixiBuildingSpriteCache.get(key);
+  if (cached) return cached;
+
+  const isMain = b.kind === "main";
+  const widthCss = isMain ? 184 : 164;
+  const heightCss = isMain ? 166 : 138;
+  const baselineY = isMain ? 108 : 78;
+  const sprite = document.createElement("canvas");
+  sprite.width = Math.ceil(widthCss * BUILDING_SPRITE_DPR);
+  sprite.height = Math.ceil(heightCss * BUILDING_SPRITE_DPR);
+  const sctx = sprite.getContext("2d");
+  const liveCtx = ctx;
+  ctx = sctx;
+  try {
+    sctx.scale(BUILDING_SPRITE_DPR, BUILDING_SPRITE_DPR);
+    const localEnv = {
+      ...playIsoEnv(),
+      ctx: sctx,
+      worldToScreen: () => ({ x: widthCss * 0.5, y: baselineY }),
+    };
+    SimIsoRenderer.drawBuilding(localEnv, { ...b, x: 0, y: 0 }, {
+      hoveredNeutral: b.owner < 0 && b.id === hoverBuildingId,
+      expansionLabel: ({ building, hoveredNeutral, activeClaimOwner, claimRatio }) => {
+        const needsExpansionMoney = activeClaimOwner < 0 && playerBank(controlledPlayer()) < EXPANSION_COST;
+        return {
+          text: claimRatio > 0 ? `BUILD ${Math.round(claimRatio * 100)}%` : needsExpansionMoney ? "NEED $100" : "EXPAND $100",
+          color: needsExpansionMoney ? "#ffb89b" : hoveredNeutral ? "#fff2ad" : teamColors[activeClaimOwner] || "#f5dd80",
+        };
+      },
+      drawProduction: ({ x, y, size, half, building }) => {
+        const item = productionByCardId.get(Number(building.pending_card_id)) || { classKey: "soldier" };
+        drawProductionPip(x, y + half + 17, size + 14, productionProgress(building), item.classKey);
+      },
+    });
+  } finally {
+    ctx = liveCtx;
+  }
+
+  const result = {
+    canvas: sprite,
+    widthCss,
+    heightCss,
+    anchorX: 0.5,
+    anchorY: baselineY / heightCss,
+  };
+  pixiBuildingSpriteCache.set(key, result);
+  if (pixiBuildingSpriteCache.size > 260) pixiBuildingSpriteCache.delete(pixiBuildingSpriteCache.keys().next().value);
+  return result;
+}
+
 function drawExpansionSiteMarker(x, y, size, progress, color, hovered, active) {
   const w = size * 1.72;
   const h = size * 0.82;
@@ -2234,26 +2424,28 @@ function drawReplayStyleUnit(u, overridePoint = null) {
     p.x += offset.x;
     p.y += offset.y;
   }
-  const r = unitRadius(u);
+  const r = overridePoint?.r ?? unitRadius(u) * canvasUiScale();
+  const visualR = r * UNIT_WORLD_ART_SCALE;
   const team = teamColors[u.owner] ?? "#c8c5bc";
-  drawReplayUnitAura(p.x, p.y, r, u);
-  drawReplayUnitBody(p.x, p.y, r, u);
+  drawReplayUnitAura(p.x, p.y, visualR, u);
+  drawReplayUnitBody(p.x, p.y, visualR, u);
   if (selected.has(u.id)) {
     ctx.save();
     ctx.strokeStyle = "rgba(255,238,156,0.95)";
     ctx.lineWidth = crispLine(2.2);
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y + r * 0.50, r * 1.18, r * 0.48, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y + visualR * 0.50, visualR * 1.18, visualR * 0.48, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
   const hpRatio = Math.max(0, u.hp / Math.max(1, u.max_hp));
-  if (hpRatio < 0.92 || selected.has(u.id)) drawHealthPip(p.x, p.y + r + 8, r * 2.1, hpRatio, team);
-  drawWorkerIntent(u, p, r);
+  if (hpRatio < 0.92 || selected.has(u.id)) drawHealthPip(p.x, p.y + visualR + 8, visualR * 2.1, hpRatio, team);
+  drawWorkerIntent(u, p, visualR);
 }
 
 const unitSpriteCache = new Map();
 const UNIT_SPRITE_DPR = renderPixelRatioCap;
+const UNIT_WORLD_ART_SCALE = 0.68;
 const rotatedUnitSpriteCache = new Map();
 const ROTATED_UNIT_BUCKETS = 32;
 
@@ -2327,13 +2519,24 @@ function getRotatedUnitSprite(klass, owner, angle) {
   return rotated;
 }
 
+window.simsystemUnitArt = {
+  classes: () => ["worker", "soldier", "archer", "bomber", "siege", "vulture", "storm_caster", "skirmisher"],
+  sprite: (klass, owner = 0, angle = 0) => getRotatedUnitSprite(klass, owner, angle),
+  radius: (klass) => unitRadius({ class: klass }),
+  worldScale: () => UNIT_WORLD_ART_SCALE,
+};
+
 function drawReplayUnitBody(x, y, r, u) {
   const angle = unitAngle(u);
   if ((snap?.units || []).length <= 120) drawShadow(x, y + r * 0.56, r * 1.04, 0.31);
   const sprite = getRotatedUnitSprite(u.class, u.owner, angle);
   const cx = Math.round(x);
   const cy = Math.round(y);
-  ctx.drawImage(sprite.canvas, cx - sprite.half, cy - sprite.half, sprite.sizeCss, sprite.sizeCss);
+  const baseVisualR = unitRadius(u) * UNIT_WORLD_ART_SCALE;
+  const screenScale = baseVisualR > 0 ? r / baseVisualR : canvasUiScale();
+  const drawHalf = sprite.half * UNIT_WORLD_ART_SCALE * screenScale;
+  const drawSize = sprite.sizeCss * UNIT_WORLD_ART_SCALE * screenScale;
+  ctx.drawImage(sprite.canvas, cx - drawHalf, cy - drawHalf, drawSize, drawSize);
   currentUnitTextAngle = angle;
 }
 
@@ -2358,7 +2561,8 @@ function unitRadius(u) {
 }
 
 function renderSeparationOffset(unit) {
-  const ring = 6.0 * Math.min(1.8, Math.max(1, camera.zoom));
+  if (isEconomyWorker(unit)) return { x: 0, y: 0 };
+  const ring = uiPx(6.0) * Math.min(1.8, Math.max(1, camera.zoom));
   const a = (unit.id * 2.399963 + classPhase(unit.class)) % (Math.PI * 2);
   const group = unit.id % 5;
   return {
@@ -2381,26 +2585,39 @@ function classPhase(kind) {
   }[kind] ?? 0;
 }
 
+function isEconomyWorker(unit) {
+  return unit?.class === "worker" && (
+    unit.intent === "mine" ||
+    unit.intent === "return" ||
+    Number(unit.worker_cargo || 0) > 0
+  );
+}
+
 function separateDisplayUnits(items) {
-  const margin = 2.8;
+  const margin = uiPx(2.8);
   for (let pass = 0; pass < 3; ++pass) {
     for (let i = 0; i < items.length; ++i) {
       const a = items[i];
       for (let j = i + 1; j < items.length; ++j) {
         const b = items[j];
-        const minDist = (a.r + b.r) * (a.u.owner === b.u.owner ? 0.86 : 1.03) + margin;
+        const ar = a.separationR ?? a.r;
+        const br = b.separationR ?? b.r;
+        const minDist = (ar + br) * (a.u.owner === b.u.owner ? 0.86 : 1.03) + margin;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const distSq = dx * dx + dy * dy;
         if (distSq >= minDist * minDist) continue;
         const dist = Math.sqrt(distSq) || 0.001;
-        const push = Math.min(6.2, (minDist - dist) * 0.50);
+        const pushLimit = (a.locked || b.locked) ? uiPx(2.4) : uiPx(6.2);
+        const push = Math.min(pushLimit, (minDist - dist) * 0.50);
         const nx = dx / dist;
         const ny = dy / dist;
-        a.x -= nx * push;
-        a.y -= ny * push;
-        b.x += nx * push;
-        b.y += ny * push;
+        const aFactor = a.locked ? 0.45 : 1.0;
+        const bFactor = b.locked ? 0.45 : 1.0;
+        a.x -= nx * push * aFactor;
+        a.y -= ny * push * aFactor;
+        b.x += nx * push * bFactor;
+        b.y += ny * push * bFactor;
       }
     }
   }
@@ -3244,35 +3461,94 @@ function drawCommandMarker() {
   ctx.restore();
 }
 
+function expireCommandMarker() {
+  if (commandMarker && performance.now() - commandMarker.time > 900) commandMarker = null;
+}
+
+function buildDisplayLists(units, buildings) {
+  displayUnitsScratch.length = 0;
+  profiled("projectUnits", () => {
+    const uiScale = canvasUiScale();
+    for (const item of units) {
+      const visual = unitVisualPosition(item);
+      const p = worldToScreen(visual.x, visual.y, unitHoverHeight(item));
+      const offset = renderSeparationOffset(item);
+      const locked = isEconomyWorker(item);
+      const radius = unitRadius(item) * uiScale;
+      displayUnitsScratch.push({
+        kind: "unit",
+        item,
+        u: item,
+        x: p.x + offset.x,
+        y: p.y + offset.y,
+        r: radius,
+        separationR: radius * (locked ? UNIT_WORLD_ART_SCALE : 1),
+        depth: isoDepth(visual.x, visual.y, 0.1),
+        locked,
+      });
+    }
+  });
+  profiled("separateDisplayUnits", () => separateDisplayUnits(displayUnitsScratch));
+  drawThingsScratch.length = 0;
+  profiled("sortDrawList", () => {
+    for (const item of buildings) drawThingsScratch.push({ kind: "building", item, depth: isoDepth(item.x, item.y, 0) });
+    for (const item of displayUnitsScratch) drawThingsScratch.push(item);
+    drawThingsScratch.sort((a, b) => a.depth - b.depth);
+  });
+}
+
+function drawPixiFrame(units, buildings) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!snap) return;
+  buildDisplayLists(units, buildings);
+  expireCommandMarker();
+  profiled("pixiWorld", () => pixiWorldRenderer.render({
+    snap,
+    units,
+    buildings,
+    displayUnits: displayUnitsScratch,
+    things: drawThingsScratch,
+    selected,
+    commandMarker,
+    hoverBuildingId,
+    camera,
+    bounds,
+    teamColors,
+    teamNames,
+    worldToScreen,
+    isoDepth,
+    uiScale: canvasUiScale(),
+    unitAngle,
+    getRotatedUnitSprite,
+    getBuildingSprite: getPixiBuildingSprite,
+    unitWorldArtScale: UNIT_WORLD_ART_SCALE,
+    canvasBuildings: false,
+    center,
+  }));
+  profiled("drawSelectionBox", drawSelectionBox);
+  profiled("drawFpsOverlay", drawFpsOverlay);
+  profiled("updatePanel", updatePanel);
+}
+
 function draw() {
   const frameStart = renderProfiler.enabled ? performance.now() : 0;
   profiled("resizeCanvas", resizeCanvas);
-  profiled("drawGround", drawGround);
   if (!snap) return;
   const units = snap.units || [];
   const buildings = snap.buildings || [];
   renderProfiler.lastUnits = units.length;
   renderProfiler.lastBuildings = buildings.length;
   profiled("updateUnitVisuals", updateUnitVisuals);
+  if (pixiWorldRenderer) {
+    drawPixiFrame(units, buildings);
+    if (renderProfiler.enabled) renderProfiler.lastFrameMs = performance.now() - frameStart;
+    return;
+  }
+  profiled("drawGround", drawGround);
   profiled("drawMinerals", () => {
     for (const m of snap.minerals || []) drawMineral(m);
   });
-  displayUnitsScratch.length = 0;
-  profiled("projectUnits", () => {
-    for (const item of units) {
-      const visual = unitVisualPosition(item);
-      const p = worldToScreen(visual.x, visual.y, unitHoverHeight(item));
-      const offset = renderSeparationOffset(item);
-      displayUnitsScratch.push({ kind: "unit", item, u: item, x: p.x + offset.x, y: p.y + offset.y, r: unitRadius(item), depth: visual.y + 0.1 });
-    }
-  });
-  profiled("separateDisplayUnits", () => separateDisplayUnits(displayUnitsScratch));
-  drawThingsScratch.length = 0;
-  profiled("sortDrawList", () => {
-    for (const item of buildings) drawThingsScratch.push({ kind: "building", item, depth: item.y });
-    for (const item of displayUnitsScratch) drawThingsScratch.push(item);
-    drawThingsScratch.sort((a, b) => a.depth - b.depth);
-  });
+  buildDisplayLists(units, buildings);
   profiled("drawThings", () => {
     for (const t of drawThingsScratch) t.kind === "building" ? drawBuilding(t.item) : drawUnit(t.item, t);
   });
@@ -3286,21 +3562,23 @@ function draw() {
 
 function drawFpsOverlay() {
   ctx.save();
-  ctx.font = "700 12px ui-monospace, SFMono-Regular, Menlo, monospace";
+  const uiScale = canvasUiScale();
+  const fontSize = Math.round(14 * uiScale);
+  ctx.font = `750 ${fontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`;
   ctx.textAlign = "right";
   ctx.textBaseline = "top";
   const text = `${fps.toFixed(0)} fps`;
-  const padX = 8;
-  const padY = 4;
+  const padX = 8 * uiScale;
+  const padY = 5 * uiScale;
   const w = ctx.measureText(text).width + padX * 2;
-  const h = 18;
-  const x = canvas.width - 10 - w;
-  const y = 10;
+  const h = 24 * uiScale;
+  const x = canvas.width - 10 * uiScale - w;
+  const y = 10 * uiScale;
   ctx.fillStyle = "rgba(8,10,12,0.66)";
   ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = "rgba(220,218,204,0.30)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  ctx.lineWidth = uiScale;
+  ctx.strokeRect(x + 0.5 * uiScale, y + 0.5 * uiScale, w - uiScale, h - uiScale);
   ctx.fillStyle = fps >= 50 ? "#a4f0a4" : fps >= 30 ? "#f5dd80" : "#ff9a7a";
   ctx.fillText(text, x + w - padX, y + padY);
   ctx.restore();
@@ -4151,6 +4429,7 @@ function loop(t) {
 
 async function boot() {
   resizeCanvas();
+  await initWorldRenderer();
   renderProductionButtons();
   renderScenarioOptions();
   scenarioSelect.value = String(currentScenario);
