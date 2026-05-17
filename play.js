@@ -245,6 +245,8 @@ const tutorialSteps = [
 ];
 const bounds = 190;
 const urlParams = new URLSearchParams(window.location.search);
+const renderProfileEnabled = urlParams.get("profile") === "1" || localStorage.getItem("simsystem_render_profile") === "1";
+const renderPixelRatioCap = Math.max(1, Math.min(2, Number(urlParams.get("renderDpr") || localStorage.getItem("simsystem_render_dpr") || 1.0)));
 const bareStartPage = window.location.search.length === 0;
 const relayPort = "8790";
 const lanMode = urlParams.get("mode") === "lan";
@@ -331,6 +333,87 @@ const playLogStorageKey = "simsystem_live_play_log_v1";
 const playLogArchiveStorageKey = "simsystem_live_play_log_archive_v1";
 let playLog = null;
 let lastLoggedSnapshotTick = -1;
+let lastClientErrorReportAt = 0;
+const renderProfiler = {
+  enabled: renderProfileEnabled,
+  frames: 0,
+  totals: Object.create(null),
+  counts: Object.create(null),
+  lastFrameMs: 0,
+  lastUnits: 0,
+  lastBuildings: 0,
+  lastSummaryAt: 0,
+  rafDeltas: [],
+  frameTimes: [],
+  maxRafDeltaMs: 0,
+  maxFrameMs: 0,
+  reset() {
+    this.frames = 0;
+    this.totals = Object.create(null);
+    this.counts = Object.create(null);
+    this.lastFrameMs = 0;
+    this.lastSummaryAt = performance.now();
+    this.rafDeltas = [];
+    this.frameTimes = [];
+    this.maxRafDeltaMs = 0;
+    this.maxFrameMs = 0;
+  },
+  add(name, ms) {
+    this.totals[name] = (this.totals[name] || 0) + ms;
+    this.counts[name] = (this.counts[name] || 0) + 1;
+  },
+  summary() {
+    const percentile = (values, p) => {
+      if (!values.length) return 0;
+      const sorted = [...values].sort((a, b) => a - b);
+      return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * p)))];
+    };
+    const sections = Object.keys(this.totals)
+      .map((name) => ({
+        name,
+        totalMs: this.totals[name],
+        calls: this.counts[name] || 0,
+        avgMs: this.totals[name] / Math.max(1, this.counts[name] || 0),
+      }))
+      .sort((a, b) => b.totalMs - a.totalMs);
+    return {
+      frames: this.frames,
+      fps,
+      lastFrameMs: this.lastFrameMs,
+      avgRafDeltaMs: this.rafDeltas.reduce((a, b) => a + b, 0) / Math.max(1, this.rafDeltas.length),
+      p95RafDeltaMs: percentile(this.rafDeltas, 0.95),
+      maxRafDeltaMs: this.maxRafDeltaMs,
+      avgMeasuredFrameMs: this.frameTimes.reduce((a, b) => a + b, 0) / Math.max(1, this.frameTimes.length),
+      p95MeasuredFrameMs: percentile(this.frameTimes, 0.95),
+      maxMeasuredFrameMs: this.maxFrameMs,
+      units: this.lastUnits,
+      buildings: this.lastBuildings,
+      canvas: { width: canvas.width, height: canvas.height, dpr: window.devicePixelRatio || 1 },
+      sections,
+    };
+  },
+  frame(deltaMs, frameMs) {
+    this.frames++;
+    this.lastFrameMs = frameMs;
+    this.rafDeltas.push(deltaMs);
+    this.frameTimes.push(frameMs);
+    if (this.rafDeltas.length > 900) this.rafDeltas.shift();
+    if (this.frameTimes.length > 900) this.frameTimes.shift();
+    this.maxRafDeltaMs = Math.max(this.maxRafDeltaMs, deltaMs);
+    this.maxFrameMs = Math.max(this.maxFrameMs, frameMs);
+  },
+};
+window.__simsystemRenderProfile = renderProfiler;
+
+function profiled(name, fn) {
+  if (!renderProfiler.enabled) return fn();
+  const start = performance.now();
+  try {
+    return fn();
+  } finally {
+    renderProfiler.add(name, performance.now() - start);
+  }
+}
 let lan = {
   ready: false,
   started: false,
@@ -783,7 +866,7 @@ function playCommandSound(commandType, unitIds = selected) {
 
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
-  const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const ratio = Math.max(1, Math.min(renderPixelRatioCap, window.devicePixelRatio || 1));
   const w = Math.max(640, Math.floor(rect.width * ratio));
   const h = Math.max(420, Math.floor(rect.height * ratio));
   if (canvas.width !== w || canvas.height !== h) {
@@ -1083,6 +1166,45 @@ async function lanApi(path, options = {}) {
   throw new Error(lan.netError);
 }
 
+async function reportClientError(error, source = "runtime") {
+  appendPlayLog("client_error", {
+    source,
+    message: String(error?.message || error || ""),
+    stack: String(error?.stack || ""),
+    snapshot: compactSnapshot(),
+  });
+  if (!lanMode || !lanToken) return;
+  const now = performance.now();
+  if (now - lastClientErrorReportAt < 500) return;
+  lastClientErrorReportAt = now;
+  try {
+    await lanApi("/api/client-error", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token: lanToken,
+        player: controlledPlayer(),
+        tick: snap?.tick ?? -1,
+        source,
+        message: String(error?.message || error || ""),
+        stack: String(error?.stack || ""),
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+      }),
+    });
+  } catch {
+    // Error reporting is diagnostic only.
+  }
+}
+
+window.addEventListener("error", (evt) => {
+  reportClientError(evt.error || evt.message, evt.filename || "window.error");
+});
+
+window.addEventListener("unhandledrejection", (evt) => {
+  reportClientError(evt.reason || "unhandled rejection", "unhandledrejection");
+});
+
 function lanCommandKey(command) {
   if (Number.isFinite(Number(command?._seq))) return `seq:${command._seq}`;
   return `sig:${JSON.stringify([
@@ -1105,6 +1227,11 @@ function send(command) {
     if (command.type) lastPlayerAction = command.type;
     return;
   }
+  sendImmediateLocal(command, `command:${command.type || "unknown"}`);
+  if (command.type) lastPlayerAction = command.type;
+}
+
+function sendImmediateLocal(command, cause = "command") {
   if (Number.isFinite(command.x)) command.x = Math.round(command.x * 1000) / 1000;
   if (Number.isFinite(command.y)) command.y = Math.round(command.y * 1000) / 1000;
   const before = snap;
@@ -1115,9 +1242,8 @@ function send(command) {
   Module.stringToUTF8(json, ptr, bytes);
   snap = ptrJson(wasm.command(ptr));
   Module._free(ptr);
-  logStateDelta(before, snap, `command:${command.type || "unknown"}`);
+  logStateDelta(before, snap, cause);
   appendPlayLog("command_result", { command: { ...command }, after: compactSnapshot() });
-  if (command.type) lastPlayerAction = command.type;
 }
 
 async function sendLan(command) {
@@ -1619,6 +1745,28 @@ function stepEngine(ticks = 1) {
 }
 
 function drawGround() {
+  const key = `${canvas.width}x${canvas.height}:${camera.x.toFixed(2)}:${camera.y.toFixed(2)}:${camera.zoom.toFixed(3)}`;
+  if (groundCache && groundCacheKey === key) {
+    ctx.drawImage(groundCache, 0, 0);
+    return;
+  }
+  groundCache = groundCache || document.createElement("canvas");
+  if (groundCache.width !== canvas.width || groundCache.height !== canvas.height) {
+    groundCache.width = canvas.width;
+    groundCache.height = canvas.height;
+  }
+  const liveCtx = ctx;
+  ctx = groundCache.getContext("2d");
+  try {
+    drawGroundUncached();
+  } finally {
+    ctx = liveCtx;
+  }
+  groundCacheKey = key;
+  ctx.drawImage(groundCache, 0, 0);
+}
+
+function drawGroundUncached() {
   const c = center();
   const g = ctx.createRadialGradient(c.x, c.y, 90, c.x, c.y, Math.max(canvas.width, canvas.height) * 0.74);
   g.addColorStop(0, "#223027");
@@ -2105,7 +2253,9 @@ function drawReplayStyleUnit(u, overridePoint = null) {
 }
 
 const unitSpriteCache = new Map();
-const UNIT_SPRITE_DPR = 2;
+const UNIT_SPRITE_DPR = renderPixelRatioCap;
+const rotatedUnitSpriteCache = new Map();
+const ROTATED_UNIT_BUCKETS = 32;
 
 function unitSpriteKey(klass, owner) {
   return `${klass}|${owner}`;
@@ -2157,17 +2307,33 @@ function getUnitSprite(klass, owner) {
   return sprite;
 }
 
+function getRotatedUnitSprite(klass, owner, angle) {
+  const bucket = ((Math.round(((angle % (Math.PI * 2)) + Math.PI * 2) / (Math.PI * 2) * ROTATED_UNIT_BUCKETS) % ROTATED_UNIT_BUCKETS) + ROTATED_UNIT_BUCKETS) % ROTATED_UNIT_BUCKETS;
+  const key = `${unitSpriteKey(klass, owner)}|${bucket}`;
+  let rotated = rotatedUnitSpriteCache.get(key);
+  if (rotated) return rotated;
+  const base = getUnitSprite(klass, owner);
+  const bucketAngle = bucket / ROTATED_UNIT_BUCKETS * Math.PI * 2;
+  const canvas2 = document.createElement("canvas");
+  canvas2.width = base.canvas.width;
+  canvas2.height = base.canvas.height;
+  const rctx = canvas2.getContext("2d");
+  rctx.scale(UNIT_SPRITE_DPR, UNIT_SPRITE_DPR);
+  rctx.translate(base.half, base.half);
+  rctx.rotate(bucketAngle);
+  rctx.drawImage(base.canvas, -base.half, -base.half, base.sizeCss, base.sizeCss);
+  rotated = { canvas: canvas2, half: base.half, sizeCss: base.sizeCss };
+  rotatedUnitSpriteCache.set(key, rotated);
+  return rotated;
+}
+
 function drawReplayUnitBody(x, y, r, u) {
   const angle = unitAngle(u);
-  drawShadow(x, y + r * 0.56, r * 1.04, 0.31);
-  const sprite = getUnitSprite(u.class, u.owner);
+  if ((snap?.units || []).length <= 120) drawShadow(x, y + r * 0.56, r * 1.04, 0.31);
+  const sprite = getRotatedUnitSprite(u.class, u.owner, angle);
   const cx = Math.round(x);
   const cy = Math.round(y);
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(angle);
-  ctx.drawImage(sprite.canvas, -sprite.half, -sprite.half, sprite.sizeCss, sprite.sizeCss);
-  ctx.restore();
+  ctx.drawImage(sprite.canvas, cx - sprite.half, cy - sprite.half, sprite.sizeCss, sprite.sizeCss);
   currentUnitTextAngle = angle;
 }
 
@@ -3079,28 +3245,43 @@ function drawCommandMarker() {
 }
 
 function draw() {
-  resizeCanvas();
-  drawGround();
+  const frameStart = renderProfiler.enabled ? performance.now() : 0;
+  profiled("resizeCanvas", resizeCanvas);
+  profiled("drawGround", drawGround);
   if (!snap) return;
-  updateUnitVisuals();
-  for (const m of snap.minerals || []) drawMineral(m);
-  const displayUnits = (snap.units || []).map((item) => {
-    const visual = unitVisualPosition(item);
-    const p = worldToScreen(visual.x, visual.y, unitHoverHeight(item));
-    const offset = renderSeparationOffset(item);
-    return { kind: "unit", item, u: item, x: p.x + offset.x, y: p.y + offset.y, r: unitRadius(item), depth: visual.y + 0.1 };
+  const units = snap.units || [];
+  const buildings = snap.buildings || [];
+  renderProfiler.lastUnits = units.length;
+  renderProfiler.lastBuildings = buildings.length;
+  profiled("updateUnitVisuals", updateUnitVisuals);
+  profiled("drawMinerals", () => {
+    for (const m of snap.minerals || []) drawMineral(m);
   });
-  separateDisplayUnits(displayUnits);
-  const things = [
-    ...(snap.buildings || []).map((item) => ({ kind: "building", item, depth: item.y })),
-    ...displayUnits,
-  ].sort((a, b) => a.depth - b.depth);
-  for (const t of things) t.kind === "building" ? drawBuilding(t.item) : drawUnit(t.item, t);
-  drawEffects();
-  drawCommandMarker();
-  drawSelectionBox();
-  drawFpsOverlay();
-  updatePanel();
+  displayUnitsScratch.length = 0;
+  profiled("projectUnits", () => {
+    for (const item of units) {
+      const visual = unitVisualPosition(item);
+      const p = worldToScreen(visual.x, visual.y, unitHoverHeight(item));
+      const offset = renderSeparationOffset(item);
+      displayUnitsScratch.push({ kind: "unit", item, u: item, x: p.x + offset.x, y: p.y + offset.y, r: unitRadius(item), depth: visual.y + 0.1 });
+    }
+  });
+  profiled("separateDisplayUnits", () => separateDisplayUnits(displayUnitsScratch));
+  drawThingsScratch.length = 0;
+  profiled("sortDrawList", () => {
+    for (const item of buildings) drawThingsScratch.push({ kind: "building", item, depth: item.y });
+    for (const item of displayUnitsScratch) drawThingsScratch.push(item);
+    drawThingsScratch.sort((a, b) => a.depth - b.depth);
+  });
+  profiled("drawThings", () => {
+    for (const t of drawThingsScratch) t.kind === "building" ? drawBuilding(t.item) : drawUnit(t.item, t);
+  });
+  profiled("drawEffects", drawEffects);
+  profiled("drawCommandMarker", drawCommandMarker);
+  profiled("drawSelectionBox", drawSelectionBox);
+  profiled("drawFpsOverlay", drawFpsOverlay);
+  profiled("updatePanel", updatePanel);
+  if (renderProfiler.enabled) renderProfiler.lastFrameMs = performance.now() - frameStart;
 }
 
 function drawFpsOverlay() {
@@ -3937,24 +4118,34 @@ window.addEventListener("keydown", (evt) => {
 });
 
 function loop(t) {
-  const dt = lastFrame ? (t - lastFrame) / 1000 : 1 / 60;
-  fps = fps * 0.9 + (1 / Math.max(0.001, dt)) * 0.1;
-  animTime = t / 1000;
-  lastFrame = t;
-  if (lanMode) {
-    pollLan();
-    pollLanLobby();
-    stepLanToServer();
-  } else if (Module && snap && !startMenuVisible && !storyIntroVisible) {
-    simAccumulator += dt * targetGameFps * playSpeed;
-    const ticks = Math.min(Math.max(8, Math.ceil(targetGameFps / 12)), Math.floor(simAccumulator));
-    if (ticks > 0) {
-      stepEngine(ticks);
-      simAccumulator -= ticks;
+  const loopStart = renderProfiler.enabled ? performance.now() : 0;
+  const rafDeltaMs = lastFrame ? t - lastFrame : 16.67;
+  try {
+    const dt = rafDeltaMs / 1000;
+    fps = fps * 0.9 + (1 / Math.max(0.001, dt)) * 0.1;
+    animTime = t / 1000;
+    lastFrame = t;
+    if (lanMode) {
+      profiled("pollLan", pollLan);
+      profiled("pollLanLobby", pollLanLobby);
+      profiled("stepLanToServer", stepLanToServer);
+    } else if (Module && snap && !startMenuVisible && !storyIntroVisible) {
+      profiled("simLocal", () => {
+        simAccumulator += dt * targetGameFps * playSpeed;
+        const ticks = Math.min(Math.max(8, Math.ceil(targetGameFps / 12)), Math.floor(simAccumulator));
+        if (ticks > 0) {
+          stepEngine(ticks);
+          simAccumulator -= ticks;
+        }
+      });
     }
+    profiled("playLiveAudio", playLiveAudio);
+    profiled("drawTotal", draw);
+  } catch (err) {
+    reportClientError(err, "loop");
+    statusEl.textContent = "Recovered from a client error; capture has the details.";
   }
-  playLiveAudio();
-  draw();
+  if (renderProfiler.enabled) renderProfiler.frame(rafDeltaMs, performance.now() - loopStart);
   requestAnimationFrame(loop);
 }
 
@@ -3993,6 +4184,7 @@ async function boot() {
     currentScenario = lan.scenario;
     botDifficulty = lan.botDifficulty || botDifficulty;
     snap = ptrJson(wasm.initLanPlayers(seed, 240000, currentScenario, lan.botMask, botDifficulty, lan.playerCount || 2));
+    applyBotAdminConfig();
     lastLiveAudioTick = snap?.tick ?? -1;
     updateLanChrome();
     appendPlayLog("engine_init", { mode: "lan", seed, scenario: currentScenario, botDifficulty, snapshot: compactSnapshot() });
@@ -4025,15 +4217,15 @@ function applyBotAdminConfig() {
   const config = botAdminConfig || decodeBase64Json(urlParams.get("botAdmin"));
   const challengeLocksOpponent = currentScenario === 10 || currentScenario === 11;
   const policy = challengeLocksOpponent ? "" : (urlParams.get("botPolicy") || config?.policy || "");
-  if (policy) send({ type: "set_policy", player: 1, policy });
+  if (policy) sendImmediateLocal({ type: "set_policy", player: 1, policy }, "admin:set_policy");
   const buildTimeScale = Number(config?.buildTimeScale ?? 1.0);
   if (Number.isFinite(buildTimeScale) && buildTimeScale > 0) {
-    send({
+    sendImmediateLocal({
       type: "set_bot_config",
       player: 1,
       build_time_scale: buildTimeScale,
       worker_target: Number(config?.targetWorkers ?? config?.workerTarget ?? 30),
-    });
+    }, "admin:set_bot_config");
   }
   if (config) {
     statusEl.title = `Bot admin: workers ${config.targetWorkers ?? config.workerTarget}, build-time ${Math.round((Number(config.buildTimeScale) || 1) * 100)}%, expand ${config.expansionAggression ?? config.expandBias}, attack ${config.aggressionThreshold ?? config.attackThreshold}`;
